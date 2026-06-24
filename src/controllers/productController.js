@@ -13,6 +13,10 @@ exports.createProduct = async (req, res) => {
   try {
     const { barcode, name, price, original_price, unit, stock } = req.body;
     
+    if (original_price && parseFloat(price) <= parseFloat(original_price)) {
+      return res.status(400).json({ error: 'Sotish narxi asl narxidan (tannarxidan) katta bo\'lishi shart! Zarariga sotish mumkin emas.' });
+    }
+
     const existing = await Product.findOne({ where: { barcode } });
     if (existing) {
       return res.status(400).json({ error: 'Product with this barcode already exists' });
@@ -34,6 +38,10 @@ exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const { barcode, name, price, original_price, unit, stock, is_active } = req.body;
+
+    if (original_price && parseFloat(price) <= parseFloat(original_price)) {
+      return res.status(400).json({ error: 'Sotish narxi asl narxidan (tannarxidan) katta bo\'lishi shart! Zarariga sotish mumkin emas.' });
+    }
 
     const product = await Product.findByPk(id);
     if (!product) {
