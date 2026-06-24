@@ -73,7 +73,7 @@ exports.login = async (req, res) => {
 exports.getUsers = async (req, res) => {
   try {
     const users = await User.findAll({
-      attributes: ['id', 'username', 'role', 'phone', 'is_active']
+      attributes: ['id', 'username', 'name', 'role', 'phone', 'is_active']
     });
     res.json(users);
   } catch (error) {
