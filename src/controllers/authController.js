@@ -4,7 +4,7 @@ const { User } = require('../models');
 
 exports.register = async (req, res) => {
   try {
-    const { username, password, role, phone } = req.body;
+    const { username, password, role, phone, name } = req.body;
 
     const existingUser = await User.findOne({ where: { username } });
     if (existingUser) {
@@ -18,7 +18,8 @@ exports.register = async (req, res) => {
       username,
       password_hash,
       role,
-      phone
+      phone,
+      name
     });
 
     res.status(201).json({
@@ -27,7 +28,8 @@ exports.register = async (req, res) => {
         id: newUser.id,
         username: newUser.username,
         role: newUser.role,
-        phone: newUser.phone
+        phone: newUser.phone,
+        name: newUser.name
       }
     });
   } catch (error) {
@@ -84,14 +86,14 @@ exports.getUsers = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, name, phone, password, is_active } = req.body;
+    const { username, name, phone, password, is_active, role } = req.body;
 
     const user = await User.findByPk(id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const updates = { username, name, phone, is_active };
+    const updates = { username, name, phone, is_active, role };
 
     if (password) {
       const salt = await bcrypt.genSalt(10);
