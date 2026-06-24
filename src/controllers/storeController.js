@@ -65,3 +65,27 @@ exports.deleteStore = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.bulkCreateStores = async (req, res) => {
+  try {
+    const storesArray = req.body;
+    if (!Array.isArray(storesArray)) {
+      return res.status(400).json({ error: 'Array of stores is required' });
+    }
+
+    const cleanedStores = storesArray.map(s => ({
+      name: s.name,
+      owner_name: s.owner_name || 'Tadbirkor',
+      phone: s.phone || '+998 90 000 00 00',
+      address: s.address,
+      map_link: s.map_link,
+      location_lat: String(s.location_lat || s.latitude || ''),
+      location_lng: String(s.location_lng || s.longitude || '')
+    }));
+
+    const newStores = await Store.bulkCreate(cleanedStores);
+    res.status(201).json(newStores);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
