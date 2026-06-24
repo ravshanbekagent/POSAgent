@@ -21,6 +21,11 @@ exports.createProduct = async (req, res) => {
     const newProduct = await Product.create({ barcode, name, price, original_price, unit, stock });
     res.status(201).json(newProduct);
   } catch (error) {
+    console.error("Create Product Error:", error);
+    if (error.errors && Array.isArray(error.errors)) {
+      const messages = error.errors.map(err => `${err.path}: ${err.message}`).join(', ');
+      return res.status(500).json({ error: `Validation error - ${messages}` });
+    }
     res.status(500).json({ error: error.message });
   }
 };
