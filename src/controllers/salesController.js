@@ -146,3 +146,43 @@ exports.getSaleDetails = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.getAllSales = async (req, res) => {
+  try {
+    const { User } = require('../models'); // import User dynamically to prevent circular dependencies if any
+    const sales = await Sale.findAll({
+      include: [
+        {
+          model: Store,
+          as: 'store',
+          attributes: ['name', 'address']
+        },
+        {
+          model: User,
+          as: 'agent',
+          attributes: ['name', 'username', 'phone']
+        },
+        {
+          model: SaleItem,
+          as: 'items',
+          include: [
+            {
+              model: Product,
+              as: 'product',
+              attributes: ['barcode', 'name', 'unit', 'price', 'original_price']
+            }
+          ]
+        },
+        {
+          model: Transaction,
+          as: 'transaction',
+          attributes: ['payment_gateway', 'status', 'amount']
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+    res.json(sales);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

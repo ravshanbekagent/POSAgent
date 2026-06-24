@@ -47,6 +47,7 @@ const seedDatabase = async () => {
       // Create Admin
       await User.create({
         username: 'admin',
+        name: 'Bosh Admin',
         password_hash: adminHash,
         role: 'admin',
         phone: '+998 90 000 00 00'
@@ -55,6 +56,7 @@ const seedDatabase = async () => {
       // Create Warehouse Manager
       await User.create({
         username: 'ombor',
+        name: 'Ombor Mudiri',
         password_hash: omborHash,
         role: 'warehouse_manager',
         phone: '+998 90 111 11 11'
@@ -64,6 +66,7 @@ const seedDatabase = async () => {
       await User.create({
         id: 2,
         username: 'sherzod_agent',
+        name: 'Sherzod Alimov',
         password_hash: agentHash,
         role: 'agent',
         phone: '+998 94 333 22 11'
@@ -73,6 +76,7 @@ const seedDatabase = async () => {
       await User.create({
         id: 3,
         username: 'malika_agent',
+        name: 'Malika Qodirova',
         password_hash: agentHash,
         role: 'agent',
         phone: '+998 97 777 55 44'
