@@ -80,3 +80,42 @@ exports.getUsers = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { username, name, phone, password, is_active } = req.body;
+
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const updates = { username, name, phone, is_active };
+
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      updates.password_hash = await bcrypt.hash(password, salt);
+    }
+
+    await user.update(updates);
+    res.json({ message: 'User updated successfully', user });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await user.destroy();
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
