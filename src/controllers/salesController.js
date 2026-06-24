@@ -1,4 +1,5 @@
 const { sequelize, Sale, SaleItem, Transaction, AgentInventory, Product, Store } = require('../models');
+const { sendTelegramNotification } = require('../utils/telegram');
 
 exports.createSale = async (req, res) => {
   const t = await sequelize.transaction();
@@ -73,6 +74,51 @@ exports.createSale = async (req, res) => {
     }, { transaction: t });
 
     await t.commit();
+
+    // Trigger Telegram notification in the background
+    (async () => {
+      try {
+        const { User } = require('../models');
+        const agent = await User.findByPk(agent_id);
+        const store = await Store.findByPk(store_id);
+
+        let itemsListHtml = '';
+        for (const item of items) {
+          const product = await Product.findByPk(item.product_id);
+          const productName = product ? product.name : `Mahsulot (ID: ${item.product_id})`;
+          const productUnit = product ? (product.unit || 'dona') : 'dona';
+          const qty = item.quantity;
+          const price = parseFloat(item.unit_price).toLocaleString('uz-UZ');
+          const subtotal = (parseFloat(item.unit_price) * qty).toLocaleString('uz-UZ');
+          itemsListHtml += `• <b>${productName}</b>: ${qty} ${productUnit} x ${price} so'm = <b>${subtotal} so'm</b>\n`;
+        }
+
+        const agentName = agent ? (agent.name || agent.username) : 'Noma\'lum Agent';
+        const agentPhone = agent ? (agent.phone || '-') : '-';
+        const storeName = store ? store.name : 'Noma\'lum Do\'kon';
+        const storeAddress = store ? (store.address || '-') : '-';
+        const totalSum = parseFloat(total_amount).toLocaleString('uz-UZ');
+        const payMethod = (payment_gateway || 'click').toUpperCase();
+
+        const telegramMessage = 
+`🔔 <b>YANGI SAVDO RO'YXATDAN O'TKAZILDI!</b>
+
+👤 <b>Agent:</b> ${agentName} (${agentPhone})
+🏪 <b>Do'kon:</b> ${storeName}
+📍 <b>Manzil:</b> ${storeAddress}
+
+💰 <b>Umumiy summa:</b> <b>${totalSum} so'm</b>
+💳 <b>To'lov turi:</b> ${payMethod}
+
+📦 <b>Sotilgan mahsulotlar:</b>
+${itemsListHtml}
+📅 <i>Sana: ${new Date().toLocaleString('uz-UZ')}</i>`;
+
+        await sendTelegramNotification(telegramMessage);
+      } catch (err) {
+        console.error('Telegram notification prep failed:', err);
+      }
+    })();
 
     res.status(201).json({
       message: 'Sale created successfully. Awaiting payment.',
