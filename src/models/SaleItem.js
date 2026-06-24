@@ -23,6 +23,11 @@ const SaleItem = sequelize.define('SaleItem', {
     type: DataTypes.DECIMAL(12, 2),
     allowNull: false
   },
+  original_price: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true,
+    defaultValue: 0.00
+  },
   subtotal: {
     type: DataTypes.DECIMAL(12, 2),
     allowNull: false
