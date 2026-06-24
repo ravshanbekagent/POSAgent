@@ -6,5 +6,6 @@ const { authenticateToken, authorizeRoles } = require('../middlewares/auth');
 router.get('/', authenticateToken, storeController.getStores);
 router.post('/', authenticateToken, authorizeRoles('admin', 'agent'), storeController.createStore);
 router.put('/:id', authenticateToken, authorizeRoles('admin', 'agent'), storeController.updateStore);
+router.delete('/:id', authenticateToken, authorizeRoles('admin'), storeController.deleteStore);
 
 module.exports = router;

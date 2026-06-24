@@ -51,3 +51,17 @@ exports.updateStore = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.deleteStore = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const store = await Store.findByPk(id);
+    if (!store) {
+      return res.status(404).json({ error: 'Store not found' });
+    }
+    await store.destroy();
+    res.json({ message: 'Store deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
