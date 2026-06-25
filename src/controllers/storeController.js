@@ -11,7 +11,7 @@ exports.getStores = async (req, res) => {
 
 exports.createStore = async (req, res) => {
   try {
-    const { name, owner_name, phone, address, map_link, location_lat, location_lng } = req.body;
+    const { name, owner_name, phone, address, map_link, location_lat, location_lng, agent_id, order } = req.body;
     const newStore = await Store.create({
       name,
       owner_name,
@@ -19,7 +19,9 @@ exports.createStore = async (req, res) => {
       address,
       map_link,
       location_lat,
-      location_lng
+      location_lng,
+      agent_id,
+      order
     });
     res.status(201).json(newStore);
   } catch (error) {
@@ -30,7 +32,7 @@ exports.createStore = async (req, res) => {
 exports.updateStore = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, owner_name, phone, address, map_link, location_lat, location_lng } = req.body;
+    const { name, owner_name, phone, address, map_link, location_lat, location_lng, agent_id, order } = req.body;
 
     const store = await Store.findByPk(id);
     if (!store) {
@@ -44,7 +46,9 @@ exports.updateStore = async (req, res) => {
       address,
       map_link,
       location_lat,
-      location_lng
+      location_lng,
+      agent_id,
+      order
     });
     res.json(store);
   } catch (error) {

@@ -34,6 +34,14 @@ const Store = sequelize.define('Store', {
   location_lng: {
     type: DataTypes.STRING,
     allowNull: true
+  },
+  agent_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  order: {
+    type: DataTypes.INTEGER,
+    allowNull: true
   }
 }, {
   tableName: 'stores',
