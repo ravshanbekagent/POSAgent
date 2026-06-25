@@ -59,3 +59,17 @@ exports.getAgentInventory = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.deleteInventory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const record = await AgentInventory.findByPk(id);
+    if (!record) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+    await record.destroy();
+    res.json({ message: 'Assignment deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
