@@ -1,0 +1,116 @@
+const express = require('express');
+const router = express.Router();
+
+// In-memory storage for active callbacks
+// Structure: { [serialNumber]: { payload, timestamp } }
+if (!global.tindaCallbacks) {
+  global.tindaCallbacks = {};
+}
+
+// 1. Tinda Webhook Endpoint (Receives callback from Tinda/ERA)
+router.post('/callback', (req, res) => {
+  try {
+    const payload = req.body;
+    console.log('Received Tinda Webhook Callback:', JSON.stringify(payload, null, 2));
+
+    // Try to find the serial number in standard fields
+    const serialNumber = payload.serial_number || 
+                         payload.serialNumber || 
+                         (payload.payload && (payload.payload.serial_number || payload.payload.serialNumber));
+
+    if (!serialNumber) {
+      console.warn('Tinda callback received, but no serial number found in body.');
+      return res.status(400).json({ success: false, error: 'serialNumber is required' });
+    }
+
+    // Store in global memory
+    global.tindaCallbacks[serialNumber] = {
+      payload: payload,
+      timestamp: Date.now()
+    };
+
+    console.log(`Stored callback for Terminal Serial Number: ${serialNumber}`);
+    return res.json({ success: true, message: 'Callback registered successfully' });
+  } catch (error) {
+    console.error('Error handling Tinda callback:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 2. Poll Endpoint (Frontend checks if a callback has arrived for a serial number)
+router.get('/callback/:serialNumber', (req, res) => {
+  try {
+    const { serialNumber } = req.params;
+    const callbackData = global.tindaCallbacks[serialNumber];
+
+    if (!callbackData) {
+      return res.json({ found: false });
+    }
+
+    // Check if the callback is older than 3 minutes (180,000ms) to prevent stale data
+    const age = Date.now() - callbackData.timestamp;
+    if (age > 180000) {
+      delete global.tindaCallbacks[serialNumber];
+      return res.json({ found: false, message: 'Callback expired' });
+    }
+
+    // Return and remove from memory so it's only consumed once
+    delete global.tindaCallbacks[serialNumber];
+    console.log(`Callback consumed and cleared for Serial Number: ${serialNumber}`);
+    return res.json({ found: true, callback: callbackData.payload });
+  } catch (error) {
+    console.error('Error polling Tinda callback:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 3. Mock Webhook Endpoint (For local testing/simulation)
+router.post('/mock-callback', (req, res) => {
+  try {
+    const { serialNumber, products, totalAmount } = req.body;
+
+    if (!serialNumber) {
+      return res.status(400).json({ success: false, error: 'serialNumber is required' });
+    }
+
+    // Create a mock payload resembling Tinda's structure
+    const mockPayload = {
+      sales_id: `MOCK-${Date.now()}`,
+      receipt_number: Math.floor(Math.random() * 1000) + 1,
+      date: new Date().toISOString(),
+      serial_number: serialNumber,
+      total_amount: totalAmount || 11750000,
+      payment: {
+        payment_method: 'by other cashless',
+        amount: totalAmount || 11750000
+      },
+      products: products || [
+        {
+          productId: 1, // matches our seeded product IQOS Iluma One
+          productName: 'IQOS Iluma One (Pebble Grey)',
+          price: 350000,
+          quantity: 2
+        },
+        {
+          productId: 2, // matches Heets Amber Selection
+          productName: 'Heets Amber Selection',
+          price: 18000,
+          quantity: 50
+        }
+      ]
+    };
+
+    global.tindaCallbacks[serialNumber] = {
+      payload: mockPayload,
+      timestamp: Date.now()
+    };
+
+    console.log(`Mock callback registered for Serial Number: ${serialNumber}`);
+    return res.json({ success: true, message: 'Mock callback registered', payload: mockPayload });
+  } catch (error) {
+    console.error('Error creating mock callback:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+module.exports = router;

@@ -16,6 +16,7 @@ const productRoutes = require('./routes/productRoutes');
 const storeRoutes = require('./routes/storeRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
 const salesRoutes = require('./routes/salesRoutes');
+const tindaRoutes = require('./routes/tindaRoutes');
 
 // Mount routes
 app.use('/api/auth', authRoutes);
@@ -23,6 +24,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/stores', storeRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/tinda', tindaRoutes);
 
 // Basic test route
 app.get('/api/health', (req, res) => {
@@ -127,13 +129,13 @@ const startServer = async () => {
 
     // Seed database with default values
     await seedDatabase();
-
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-    });
   } catch (error) {
-    console.error('Unable to connect to the database or start server:', error);
+    console.error('Database connection failed, running in server-only/mock mode:', error.message);
   }
+
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
 };
 
 startServer();
