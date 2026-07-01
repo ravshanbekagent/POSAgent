@@ -73,6 +73,9 @@ exports.getAgentInventory = async (req, res) => {
     });
 
     const activeInventory = inventory.filter(item => {
+      const duration = item.duration_days;
+      if (duration === 9999 || duration === 0) return true;
+
       const today = new Date(searchDate);
       today.setHours(0, 0, 0, 0);
 
@@ -82,7 +85,7 @@ exports.getAgentInventory = async (req, res) => {
       const diffTime = today.getTime() - assignDate.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-      return diffDays >= 0 && diffDays < (item.duration_days || 1);
+      return diffDays >= 0 && diffDays < (duration || 1);
     });
 
     res.json(activeInventory);
