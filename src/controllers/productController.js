@@ -19,6 +19,17 @@ exports.createProduct = async (req, res) => {
 
     const existing = await Product.findOne({ where: { barcode } });
     if (existing) {
+      if (!existing.is_active) {
+        await existing.update({
+          name,
+          price,
+          original_price: original_price || 0,
+          unit: unit || 'dona',
+          stock: stock || 0,
+          is_active: true
+        });
+        return res.status(201).json(existing);
+      }
       return res.status(400).json({ error: 'Product with this barcode already exists' });
     }
 
