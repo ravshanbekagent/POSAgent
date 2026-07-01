@@ -2,7 +2,7 @@ const { AgentInventory, Product } = require('../models');
 
 exports.assignInventory = async (req, res) => {
   try {
-    const { agent_id, date, products } = req.body; // products: [{ product_id, qty_given }]
+    const { agent_id, date, duration_days, products } = req.body; // products: [{ product_id, qty_given }]
 
     if (!agent_id || !date || !products || !Array.isArray(products)) {
       return res.status(400).json({ error: 'Missing required fields or products format is invalid' });
@@ -35,13 +35,14 @@ exports.assignInventory = async (req, res) => {
       await product.update({ stock: product.stock - qtyDiff });
 
       if (record) {
-        await record.update({ qty_given });
+        await record.update({ qty_given, duration_days: duration_days || 1 });
       } else {
         record = await AgentInventory.create({
           agent_id,
           product_id,
           qty_given,
-          date
+          date,
+          duration_days: duration_days || 1
         });
       }
       createdRecords.push(record);
@@ -61,7 +62,7 @@ exports.getAgentInventory = async (req, res) => {
     const searchDate = date || new Date().toISOString().split('T')[0];
 
     const inventory = await AgentInventory.findAll({
-      where: { agent_id: agentId, date: searchDate },
+      where: { agent_id: agentId },
       include: [
         {
           model: Product,
@@ -71,7 +72,20 @@ exports.getAgentInventory = async (req, res) => {
       ]
     });
 
-    res.json(inventory);
+    const activeInventory = inventory.filter(item => {
+      const today = new Date(searchDate);
+      today.setHours(0, 0, 0, 0);
+
+      const assignDate = new Date(item.date);
+      assignDate.setHours(0, 0, 0, 0);
+
+      const diffTime = today.getTime() - assignDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      return diffDays >= 0 && diffDays < (item.duration_days || 1);
+    });
+
+    res.json(activeInventory);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

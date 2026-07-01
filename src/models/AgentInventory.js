@@ -31,6 +31,11 @@ const AgentInventory = sequelize.define('AgentInventory', {
     type: DataTypes.DATEONLY,
     allowNull: false,
     defaultValue: DataTypes.NOW
+  },
+  duration_days: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 1
   }
 }, {
   tableName: 'agent_inventories',

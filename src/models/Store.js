@@ -39,6 +39,15 @@ const Store = sequelize.define('Store', {
     type: DataTypes.INTEGER,
     allowNull: true
   },
+  assigned_date: {
+    type: DataTypes.DATEONLY,
+    allowNull: true
+  },
+  duration_days: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 1
+  },
   order: {
     type: DataTypes.INTEGER,
     allowNull: true
