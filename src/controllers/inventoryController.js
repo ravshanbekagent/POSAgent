@@ -1,7 +1,43 @@
 const { AgentInventory, Product } = require('../models');
 
+const cleanupExpiredAssignments = async () => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const allRecords = await AgentInventory.findAll();
+
+    for (const record of allRecords) {
+      const duration = record.duration_days;
+      if (duration === 9999 || duration === 0) continue; // skip permanent assignments
+
+      const assignDate = new Date(record.date);
+      assignDate.setHours(0, 0, 0, 0);
+
+      const diffTime = today.getTime() - assignDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays >= (duration || 1)) {
+        // Expired! Return remaining quantity to product stock
+        const remainingQty = record.qty_given - record.qty_sold - record.qty_returned;
+        if (remainingQty > 0) {
+          const product = await Product.findByPk(record.product_id);
+          if (product) {
+            await product.update({ stock: product.stock + remainingQty });
+          }
+        }
+        // Destroy the expired record
+        await record.destroy();
+      }
+    }
+  } catch (error) {
+    console.error('Error during cleanupExpiredAssignments:', error);
+  }
+};
+
 exports.assignInventory = async (req, res) => {
   try {
+    await cleanupExpiredAssignments();
     const { agent_id, date, duration_days, products } = req.body; // products: [{ product_id, qty_given }]
 
     if (!agent_id || !date || !products || !Array.isArray(products)) {
@@ -56,6 +92,7 @@ exports.assignInventory = async (req, res) => {
 
 exports.getAgentInventory = async (req, res) => {
   try {
+    await cleanupExpiredAssignments();
     const { agentId } = req.params;
     const { date } = req.query;
 
@@ -96,6 +133,7 @@ exports.getAgentInventory = async (req, res) => {
 
 exports.updateInventory = async (req, res) => {
   try {
+    await cleanupExpiredAssignments();
     const { id } = req.params;
     const { qty_given } = req.body;
 
