@@ -7,8 +7,33 @@ if (!global.tindaCallbacks) {
   global.tindaCallbacks = {};
 }
 
+// Queue for pending unassigned payments
+if (!global.tindaUnassignedCallbacks) {
+  global.tindaUnassignedCallbacks = [];
+}
+
+// Helper to look up agent ID by terminal serial number
+async function getAgentIdBySerialNumber(serialNumber) {
+  try {
+    const { User } = require('../models');
+    const user = await User.findOne({ where: { terminal_sn: serialNumber } });
+    if (user) return user.id;
+  } catch (err) {
+    console.warn("DB user lookup failed in tindaRoutes, using fallback.");
+  }
+  
+  // Mock fallback
+  if (global.mockTerminalMappings) {
+    const key = Object.keys(global.mockTerminalMappings).find(
+      k => global.mockTerminalMappings[k] === serialNumber
+    );
+    if (key) return parseInt(key);
+  }
+  return null;
+}
+
 // 1. Tinda Webhook Endpoint (Receives callback from Tinda/ERA)
-router.post('/callback', (req, res) => {
+router.post('/callback', async (req, res) => {
   try {
     const payload = req.body;
     console.log('Received Tinda Webhook Callback:', JSON.stringify(payload, null, 2));
@@ -23,13 +48,34 @@ router.post('/callback', (req, res) => {
       return res.status(400).json({ success: false, error: 'serialNumber is required' });
     }
 
-    // Store in global memory
+    // Store in global memory for active polling
     global.tindaCallbacks[serialNumber] = {
       payload: payload,
       timestamp: Date.now()
     };
 
     console.log(`Stored callback for Terminal Serial Number: ${serialNumber}`);
+
+    // Add to unassigned payments queue
+    const agentId = await getAgentIdBySerialNumber(serialNumber);
+    if (agentId) {
+      const transId = payload.sales_id || payload.receipt_number || `PEND-${Date.now()}`;
+      const exists = global.tindaUnassignedCallbacks.some(c => c.payload.sales_id === transId || c.payload.receipt_number === payload.receipt_number);
+      if (!exists) {
+        global.tindaUnassignedCallbacks.push({
+          id: `PEND-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          agentId: agentId,
+          serialNumber: serialNumber,
+          amount: parseFloat(payload.total_amount || (payload.payment && payload.payment.amount) || 0),
+          products: payload.products || [],
+          timestamp: Date.now(),
+          status: 'pending',
+          payload: payload
+        });
+        console.log(`Unassigned payment added to queue for Agent ID: ${agentId}`);
+      }
+    }
+
     return res.json({ success: true, message: 'Callback registered successfully' });
   } catch (error) {
     console.error('Error handling Tinda callback:', error);
@@ -56,6 +102,14 @@ router.get('/callback/:serialNumber', (req, res) => {
 
     // Return and remove from memory so it's only consumed once
     delete global.tindaCallbacks[serialNumber];
+
+    // Clean up corresponding pending unassigned payments since it's now consumed inside cashier screen
+    if (global.tindaUnassignedCallbacks) {
+      global.tindaUnassignedCallbacks = global.tindaUnassignedCallbacks.filter(
+        c => c.serialNumber !== serialNumber
+      );
+    }
+
     console.log(`Callback consumed and cleared for Serial Number: ${serialNumber}`);
     return res.json({ found: true, callback: callbackData.payload });
   } catch (error) {
@@ -294,6 +348,125 @@ router.post('/mock-zreport', (req, res) => {
   } catch (error) {
     console.error('Error creating mock Z-Report:', error);
     return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 10. GET /pending-payments/:agentId (Get unassigned terminal payments for an agent)
+router.get('/pending-payments/:agentId', (req, res) => {
+  try {
+    const agentId = parseInt(req.params.agentId);
+    const pending = (global.tindaUnassignedCallbacks || []).filter(
+      c => c.agentId === agentId && c.status === 'pending'
+    );
+    return res.json(pending);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 11. POST /assign-payment (Bind pending payment to a store and record the sale)
+router.post('/assign-payment', async (req, res) => {
+  try {
+    const { paymentId, storeId } = req.body;
+    if (!paymentId || !storeId) {
+      return res.status(400).json({ error: 'paymentId and storeId are required' });
+    }
+
+    const paymentIndex = (global.tindaUnassignedCallbacks || []).findIndex(
+      c => c.id === paymentId
+    );
+    if (paymentIndex === -1) {
+      return res.status(404).json({ error: 'Pending payment not found' });
+    }
+
+    const payment = global.tindaUnassignedCallbacks[paymentIndex];
+
+    try {
+      const { Sale, SaleItem, Transaction } = require('../models');
+
+      // Create Sale in DB
+      const newSale = await Sale.create({
+        agent_id: payment.agentId,
+        store_id: parseInt(storeId),
+        total_amount: payment.amount,
+        status: 'completed'
+      });
+
+      // Create Sale Items if products exist
+      if (payment.products && payment.products.length > 0) {
+        for (const prod of payment.products) {
+          await SaleItem.create({
+            sale_id: newSale.id,
+            product_id: prod.productId || 1, // fallback to product 1
+            quantity: prod.quantity || 1,
+            unit_price: prod.price || 0,
+            original_price: prod.price || 0
+          });
+
+          // Deduct inventory
+          try {
+            const { AgentInventory } = require('../models');
+            const inv = await AgentInventory.findOne({
+              where: { agent_id: payment.agentId, product_id: prod.productId || 1 }
+            });
+            if (inv) {
+              inv.stock = Math.max(0, inv.stock - (prod.quantity || 1));
+              await inv.save();
+            }
+          } catch (invErr) {
+            console.warn("Inventory deduction failed:", invErr.message);
+          }
+        }
+      } else {
+        // Create a general item
+        await SaleItem.create({
+          sale_id: newSale.id,
+          product_id: 1, // default product
+          quantity: 1,
+          unit_price: payment.amount,
+          original_price: payment.amount
+        });
+      }
+
+      // Create Transaction
+      await Transaction.create({
+        sale_id: newSale.id,
+        payment_gateway: 'tinda',
+        transaction_id: payment.id,
+        status: 'paid',
+        amount: payment.amount,
+        paid_at: new Date()
+      });
+
+    } catch (dbErr) {
+      console.warn("DB Sale creation failed, using mock mode fallback:", dbErr.message);
+      // Mock Mode fallback
+      if (!global.mockSales) {
+        global.mockSales = [];
+      }
+      const mockSale = {
+        id: `MOCK-SALE-${Date.now()}`,
+        agent_id: payment.agentId,
+        store_id: parseInt(storeId),
+        total_amount: payment.amount,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        items: (payment.products || []).map(p => ({
+          productName: p.productName || 'Mahsulot',
+          quantity: p.quantity || 1,
+          unit_price: p.price || 0
+        }))
+      };
+      global.mockSales.push(mockSale);
+    }
+
+    // Remove from unassigned queue
+    global.tindaUnassignedCallbacks.splice(paymentIndex, 1);
+
+    return res.json({ success: true, message: 'Payment successfully assigned and sale registered' });
+  } catch (error) {
+    console.error("Error in assign-payment:", error);
+    return res.status(500).json({ error: error.message });
   }
 });
 
