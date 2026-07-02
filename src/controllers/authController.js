@@ -2,9 +2,18 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 
+// Mock terminal SN mappings storage for DB-less mode
+if (!global.mockTerminalMappings) {
+  global.mockTerminalMappings = {
+    2: '2820330855',
+    3: 'TEST-SN-999'
+  };
+}
+
+
 exports.register = async (req, res) => {
   try {
-    const { username, password, role, phone, name } = req.body;
+    const { username, password, role, phone, name, terminal_sn } = req.body;
 
     const existingUser = await User.findOne({ where: { username } });
     if (existingUser) {
@@ -19,7 +28,8 @@ exports.register = async (req, res) => {
       password_hash,
       role,
       phone,
-      name
+      name,
+      terminal_sn
     });
 
     res.status(201).json({
@@ -29,7 +39,8 @@ exports.register = async (req, res) => {
         username: newUser.username,
         role: newUser.role,
         phone: newUser.phone,
-        name: newUser.name
+        name: newUser.name,
+        terminal_sn: newUser.terminal_sn
       }
     });
   } catch (error) {
@@ -63,7 +74,8 @@ exports.login = async (req, res) => {
         id: user.id,
         username: user.username,
         role: user.role,
-        phone: user.phone
+        phone: user.phone,
+        terminal_sn: user.terminal_sn
       }
     });
   } catch (error) {
@@ -77,7 +89,7 @@ exports.login = async (req, res) => {
       return res.json({
         message: 'Login successful (Mock Mode)',
         token,
-        user: { id: 1, username: 'admin', role: 'admin', phone: '+998 90 000 00 00' }
+        user: { id: 1, username: 'admin', role: 'admin', phone: '+998 90 000 00 00', terminal_sn: global.mockTerminalMappings[1] || null }
       });
     }
     if (username === 'sherzod_agent' && password === '123') {
@@ -89,7 +101,7 @@ exports.login = async (req, res) => {
       return res.json({
         message: 'Login successful (Mock Mode)',
         token,
-        user: { id: 2, username: 'sherzod_agent', role: 'agent', phone: '+998 94 333 22 11' }
+        user: { id: 2, username: 'sherzod_agent', role: 'agent', phone: '+998 94 333 22 11', terminal_sn: global.mockTerminalMappings[2] || '2820330855' }
       });
     }
     res.status(500).json({ error: error.message });
@@ -99,31 +111,30 @@ exports.login = async (req, res) => {
 exports.getUsers = async (req, res) => {
   try {
     const users = await User.findAll({
-      attributes: ['id', 'username', 'name', 'role', 'phone', 'is_active']
+      attributes: ['id', 'username', 'name', 'role', 'phone', 'is_active', 'terminal_sn']
     });
     res.json(users);
   } catch (error) {
     console.warn("DB getUsers query failed, falling back to mock users.");
     const mockUsers = [
-      { id: 1, username: 'admin', name: 'Bosh Admin', role: 'admin', phone: '+998 90 000 00 00', is_active: true },
-      { id: 2, username: 'sherzod_agent', name: 'Sherzod Alimov', role: 'agent', phone: '+998 94 333 22 11', is_active: true },
-      { id: 3, username: 'malika_agent', name: 'Malika Qodirova', role: 'agent', phone: '+998 97 777 55 44', is_active: true }
+      { id: 1, username: 'admin', name: 'Bosh Admin', role: 'admin', phone: '+998 90 000 00 00', is_active: true, terminal_sn: global.mockTerminalMappings[1] || null },
+      { id: 2, username: 'sherzod_agent', name: 'Sherzod Alimov', role: 'agent', phone: '+998 94 333 22 11', is_active: true, terminal_sn: global.mockTerminalMappings[2] || '2820330855' },
+      { id: 3, username: 'malika_agent', name: 'Malika Qodirova', role: 'agent', phone: '+998 97 777 55 44', is_active: true, terminal_sn: global.mockTerminalMappings[3] || 'TEST-SN-999' }
     ];
     res.json(mockUsers);
   }
 };
 
 exports.updateUser = async (req, res) => {
+  const { id } = req.params;
+  const { username, name, phone, password, is_active, role, terminal_sn } = req.body;
   try {
-    const { id } = req.params;
-    const { username, name, phone, password, is_active, role } = req.body;
-
     const user = await User.findByPk(id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const updates = { username, name, phone, is_active, role };
+    const updates = { username, name, phone, is_active, role, terminal_sn };
 
     if (password) {
       const salt = await bcrypt.genSalt(10);
@@ -133,7 +144,13 @@ exports.updateUser = async (req, res) => {
     await user.update(updates);
     res.json({ message: 'User updated successfully', user });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.warn("DB updateUser query failed, falling back to mock user update.");
+    // Save to our in-memory fallback mappings
+    global.mockTerminalMappings[id] = terminal_sn;
+    res.json({ 
+      message: 'User updated successfully (Mock Mode)', 
+      user: { id: parseInt(id), username, name, phone, role, is_active, terminal_sn } 
+    });
   }
 };
 

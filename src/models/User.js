@@ -29,6 +29,11 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  terminal_sn: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
+  },
   is_active: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
