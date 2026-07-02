@@ -5,6 +5,7 @@ const AgentInventory = require('./AgentInventory');
 const Sale = require('./Sale');
 const SaleItem = require('./SaleItem');
 const Transaction = require('./Transaction');
+const StoreVisit = require('./StoreVisit');
 
 // Define associations
 
@@ -36,6 +37,14 @@ SaleItem.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
 Sale.hasOne(Transaction, { foreignKey: 'sale_id', as: 'transaction' });
 Transaction.belongsTo(Sale, { foreignKey: 'sale_id', as: 'sale' });
 
+// User <-> StoreVisit
+User.hasMany(StoreVisit, { foreignKey: 'agent_id', as: 'visits' });
+StoreVisit.belongsTo(User, { foreignKey: 'agent_id', as: 'agent' });
+
+// Store <-> StoreVisit
+Store.hasMany(StoreVisit, { foreignKey: 'store_id', as: 'visits' });
+StoreVisit.belongsTo(Store, { foreignKey: 'store_id', as: 'store' });
+
 module.exports = {
   sequelize: require('../config/db'),
   User,
@@ -44,5 +53,6 @@ module.exports = {
   AgentInventory,
   Sale,
   SaleItem,
-  Transaction
+  Transaction,
+  StoreVisit
 };
