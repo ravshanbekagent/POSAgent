@@ -48,7 +48,10 @@ router.post('/callback', async (req, res) => {
       global.tindaWebhookLogs.unshift({
         endpoint: '/callback',
         timestamp: new Date().toISOString(),
-        body: payload
+        method: req.method,
+        headers: req.headers,
+        query: req.query,
+        body: req.body || null
       });
       if (global.tindaWebhookLogs.length > 50) {
         global.tindaWebhookLogs.pop();
