@@ -21,7 +21,7 @@ exports.createProduct = async (req, res) => {
     const { 
       barcode, name, price, original_price, unit, stock,
       category, psid, marked, is_integer_units, package_code,
-      inn, pinfl, owner_type, store_name, vat
+      inn, pinfl, owner_type, store_name, vat, unit_code
     } = req.body;
     
     if (original_price && parseFloat(price) < parseFloat(original_price)) {
@@ -47,7 +47,8 @@ exports.createProduct = async (req, res) => {
           pinfl,
           owner_type,
           store_name,
-          vat
+          vat,
+          unit_code
         });
         return res.status(201).json(existing);
       }
@@ -57,7 +58,7 @@ exports.createProduct = async (req, res) => {
     const newProduct = await Product.create({ 
       barcode, name, price, original_price, unit, stock,
       category, psid, marked, is_integer_units, package_code,
-      inn, pinfl, owner_type, store_name, vat
+      inn, pinfl, owner_type, store_name, vat, unit_code
     });
     res.status(201).json(newProduct);
   } catch (error) {
@@ -76,7 +77,7 @@ exports.updateProduct = async (req, res) => {
     const { 
       barcode, name, price, original_price, unit, stock, is_active,
       category, psid, marked, is_integer_units, package_code,
-      inn, pinfl, owner_type, store_name, vat
+      inn, pinfl, owner_type, store_name, vat, unit_code
     } = req.body;
 
     if (original_price && parseFloat(price) < parseFloat(original_price)) {
@@ -91,7 +92,7 @@ exports.updateProduct = async (req, res) => {
     await product.update({ 
       barcode, name, price, original_price, unit, stock, is_active,
       category, psid, marked, is_integer_units, package_code,
-      inn, pinfl, owner_type, store_name, vat
+      inn, pinfl, owner_type, store_name, vat, unit_code
     });
     res.json(product);
   } catch (error) {

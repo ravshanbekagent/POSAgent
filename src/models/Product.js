@@ -45,6 +45,10 @@ const Product = sequelize.define('Product', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  unit_code: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   marked: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
