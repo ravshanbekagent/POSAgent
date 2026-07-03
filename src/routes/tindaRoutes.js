@@ -12,6 +12,11 @@ if (!global.tindaUnassignedCallbacks) {
   global.tindaUnassignedCallbacks = [];
 }
 
+// Webhook log history for debugging
+if (!global.tindaWebhookLogs) {
+  global.tindaWebhookLogs = [];
+}
+
 // Helper to look up agent ID by terminal serial number
 async function getAgentIdBySerialNumber(serialNumber) {
   try {
@@ -37,6 +42,18 @@ router.post('/callback', async (req, res) => {
   try {
     const payload = req.body;
     console.log('Received Tinda Webhook Callback:', JSON.stringify(payload, null, 2));
+
+    // Log to webhook debug history
+    if (global.tindaWebhookLogs) {
+      global.tindaWebhookLogs.unshift({
+        endpoint: '/callback',
+        timestamp: new Date().toISOString(),
+        body: payload
+      });
+      if (global.tindaWebhookLogs.length > 50) {
+        global.tindaWebhookLogs.pop();
+      }
+    }
 
     // Try to find the serial number in standard fields
     const serialNumber = payload.serial_number || 
@@ -466,6 +483,34 @@ router.post('/assign-payment', async (req, res) => {
     return res.json({ success: true, message: 'Payment successfully assigned and sale registered' });
   } catch (error) {
     console.error("Error in assign-payment:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /debug - Check webhook log history and DB terminal SN assignments
+router.get('/debug', async (req, res) => {
+  try {
+    const { User } = require('../models');
+    let users = [];
+    try {
+      users = await User.findAll({
+        attributes: ['id', 'username', 'name', 'role', 'terminal_sn', 'is_active']
+      });
+    } catch (err) {
+      users = `DB lookup failed: ${err.message}`;
+    }
+
+    return res.json({
+      unassignedCallbacksCount: (global.tindaUnassignedCallbacks || []).length,
+      unassignedCallbacks: global.tindaUnassignedCallbacks,
+      webhookLogsCount: (global.tindaWebhookLogs || []).length,
+      webhookLogs: global.tindaWebhookLogs,
+      activeCallbacks: global.tindaCallbacks,
+      mockTerminalMappings: global.mockTerminalMappings,
+      usersInDb: users,
+      serverTime: new Date().toISOString()
+    });
+  } catch (error) {
     return res.status(500).json({ error: error.message });
   }
 });
