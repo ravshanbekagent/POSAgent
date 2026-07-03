@@ -36,6 +36,46 @@ const Product = sequelize.define('Product', {
   is_active: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
+  },
+  category: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  psid: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  marked: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  },
+  is_integer_units: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  },
+  package_code: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  inn: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  pinfl: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  owner_type: {
+    type: DataTypes.STRING,
+    defaultValue: '0'
+  },
+  store_name: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  vat: {
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 0.12
   }
 }, {
   tableName: 'products',

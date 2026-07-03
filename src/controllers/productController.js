@@ -18,7 +18,11 @@ exports.getProducts = async (req, res) => {
 
 exports.createProduct = async (req, res) => {
   try {
-    const { barcode, name, price, original_price, unit, stock } = req.body;
+    const { 
+      barcode, name, price, original_price, unit, stock,
+      category, psid, marked, is_integer_units, package_code,
+      inn, pinfl, owner_type, store_name, vat
+    } = req.body;
     
     if (original_price && parseFloat(price) < parseFloat(original_price)) {
       return res.status(400).json({ error: 'Sotish narxi asl narxidan (tannarxidan) kam bo\'lishi mumkin emas! Zarariga sotish taqiqlangan.' });
@@ -33,14 +37,28 @@ exports.createProduct = async (req, res) => {
           original_price: original_price || 0,
           unit: unit || 'dona',
           stock: stock || 0,
-          is_active: true
+          is_active: true,
+          category,
+          psid,
+          marked,
+          is_integer_units,
+          package_code,
+          inn,
+          pinfl,
+          owner_type,
+          store_name,
+          vat
         });
         return res.status(201).json(existing);
       }
       return res.status(400).json({ error: 'Product with this barcode already exists' });
     }
 
-    const newProduct = await Product.create({ barcode, name, price, original_price, unit, stock });
+    const newProduct = await Product.create({ 
+      barcode, name, price, original_price, unit, stock,
+      category, psid, marked, is_integer_units, package_code,
+      inn, pinfl, owner_type, store_name, vat
+    });
     res.status(201).json(newProduct);
   } catch (error) {
     console.error("Create Product Error:", error);
@@ -55,7 +73,11 @@ exports.createProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { barcode, name, price, original_price, unit, stock, is_active } = req.body;
+    const { 
+      barcode, name, price, original_price, unit, stock, is_active,
+      category, psid, marked, is_integer_units, package_code,
+      inn, pinfl, owner_type, store_name, vat
+    } = req.body;
 
     if (original_price && parseFloat(price) < parseFloat(original_price)) {
       return res.status(400).json({ error: 'Sotish narxi asl narxidan (tannarxidan) kam bo\'lishi mumkin emas! Zarariga sotish taqiqlangan.' });
@@ -66,7 +88,11 @@ exports.updateProduct = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    await product.update({ barcode, name, price, original_price, unit, stock, is_active });
+    await product.update({ 
+      barcode, name, price, original_price, unit, stock, is_active,
+      category, psid, marked, is_integer_units, package_code,
+      inn, pinfl, owner_type, store_name, vat
+    });
     res.json(product);
   } catch (error) {
     res.status(500).json({ error: error.message });
