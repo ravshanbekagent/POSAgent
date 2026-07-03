@@ -7,10 +7,10 @@ exports.getProducts = async (req, res) => {
   } catch (error) {
     console.warn("DB getProducts query failed, falling back to mock products.");
     const mockProducts = [
-      { id: 1, barcode: '48200001', name: 'IQOS Iluma One (Pebble Grey)', price: 350000, original_price: 300000, unit: 'dona', stock: 150, is_active: true },
-      { id: 2, barcode: '48200002', name: 'Heets Amber Selection', price: 18000, original_price: 15000, unit: 'blok', stock: 1200, is_active: true },
-      { id: 3, barcode: '48200003', name: 'IQOS Terea Silver', price: 22000, original_price: 19000, unit: 'blok', stock: 800, is_active: true },
-      { id: 4, barcode: '48200004', name: 'Fiit Regular', price: 17000, original_price: 14000, unit: 'blok', stock: 650, is_active: true }
+      { id: 1, barcode: '48200001', name: 'IQOS Iluma One (Pebble Grey)', price: 350000, original_price: 0, unit: 'dona', stock: 150, is_active: true },
+      { id: 2, barcode: '48200002', name: 'Heets Amber Selection', price: 18000, original_price: 0, unit: 'blok', stock: 1200, is_active: true },
+      { id: 3, barcode: '48200003', name: 'IQOS Terea Silver', price: 22000, original_price: 0, unit: 'blok', stock: 800, is_active: true },
+      { id: 4, barcode: '48200004', name: 'Fiit Regular', price: 17000, original_price: 0, unit: 'blok', stock: 650, is_active: true }
     ];
     res.json(mockProducts);
   }
@@ -19,14 +19,10 @@ exports.getProducts = async (req, res) => {
 exports.createProduct = async (req, res) => {
   try {
     const { 
-      barcode, name, price, original_price, unit, stock,
+      barcode, name, price, unit, stock,
       category, psid, marked, is_integer_units, package_code,
       inn, pinfl, owner_type, store_name, vat, unit_code
     } = req.body;
-    
-    if (original_price && parseFloat(price) < parseFloat(original_price)) {
-      return res.status(400).json({ error: 'Sotish narxi asl narxidan (tannarxidan) kam bo\'lishi mumkin emas! Zarariga sotish taqiqlangan.' });
-    }
 
     const existing = await Product.findOne({ where: { barcode } });
     if (existing) {
@@ -34,7 +30,7 @@ exports.createProduct = async (req, res) => {
         await existing.update({
           name,
           price,
-          original_price: original_price || 0,
+          original_price: 0,
           unit: unit || 'dona',
           stock: stock || 0,
           is_active: true,
@@ -56,7 +52,7 @@ exports.createProduct = async (req, res) => {
     }
 
     const newProduct = await Product.create({ 
-      barcode, name, price, original_price, unit, stock,
+      barcode, name, price, original_price: 0, unit, stock,
       category, psid, marked, is_integer_units, package_code,
       inn, pinfl, owner_type, store_name, vat, unit_code
     });
@@ -75,14 +71,10 @@ exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const { 
-      barcode, name, price, original_price, unit, stock, is_active,
+      barcode, name, price, unit, stock, is_active,
       category, psid, marked, is_integer_units, package_code,
       inn, pinfl, owner_type, store_name, vat, unit_code
     } = req.body;
-
-    if (original_price && parseFloat(price) < parseFloat(original_price)) {
-      return res.status(400).json({ error: 'Sotish narxi asl narxidan (tannarxidan) kam bo\'lishi mumkin emas! Zarariga sotish taqiqlangan.' });
-    }
 
     const product = await Product.findByPk(id);
     if (!product) {
@@ -90,7 +82,7 @@ exports.updateProduct = async (req, res) => {
     }
 
     await product.update({ 
-      barcode, name, price, original_price, unit, stock, is_active,
+      barcode, name, price, original_price: 0, unit, stock, is_active,
       category, psid, marked, is_integer_units, package_code,
       inn, pinfl, owner_type, store_name, vat, unit_code
     });
