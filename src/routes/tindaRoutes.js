@@ -73,11 +73,29 @@ router.post('/callback', async (req, res) => {
     // Try to find the serial number in standard fields
     const serialNumber = payload.serial_number || 
                          payload.serialNumber || 
-                         (payload.payload && (payload.payload.serial_number || payload.payload.serialNumber));
+                         (payload.pos && payload.pos.posHardwareSerialNumber) ||
+                         (payload.payload && (payload.payload.serial_number || payload.payload.serialNumber || (payload.payload.pos && payload.payload.pos.posHardwareSerialNumber)));
 
     if (!serialNumber) {
       console.warn('Tinda callback received, but no serial number found in body.');
       return res.status(400).json({ success: false, error: 'serialNumber is required' });
+    }
+
+    // Normalize properties for frontend and database compatibility
+    if (!payload.serial_number && serialNumber) {
+      payload.serial_number = serialNumber;
+    }
+    if (!payload.products && payload.productList) {
+      payload.products = payload.productList.map(p => ({
+        productId: (p.product && p.product.id) || p.productId || p.id,
+        productName: p.productName || (p.product && p.product.name) || 'Mahsulot',
+        price: parseFloat(p.price || 0),
+        quantity: parseInt(p.amount || p.quantity || 1),
+        barcode: (p.barcodes && p.barcodes[0]) || (p.product && p.product.barcodes && p.product.barcodes[0]) || ''
+      }));
+    }
+    if (!payload.total_amount) {
+      payload.total_amount = parseFloat(payload.amount || (payload.payment && payload.payment.amount) || 0);
     }
 
     // Store in global memory for active polling
@@ -91,14 +109,19 @@ router.post('/callback', async (req, res) => {
     // Add to unassigned payments queue
     const agentId = await getAgentIdBySerialNumber(serialNumber);
     if (agentId) {
-      const transId = payload.sales_id || payload.receipt_number || `PEND-${Date.now()}`;
-      const exists = global.tindaUnassignedCallbacks.some(c => c.payload.sales_id === transId || c.payload.receipt_number === payload.receipt_number);
+      const transId = payload.id || payload.salePublicId || payload.sales_id || payload.receipt_number || payload.receiptNumber || `PEND-${Date.now()}`;
+      const exists = global.tindaUnassignedCallbacks.some(c => 
+        (c.payload && c.payload.id === payload.id) || 
+        c.payload.sales_id === transId || 
+        c.payload.receipt_number === payload.receipt_number ||
+        c.payload.receiptNumber === payload.receiptNumber
+      );
       if (!exists) {
         global.tindaUnassignedCallbacks.push({
           id: `PEND-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           agentId: agentId,
           serialNumber: serialNumber,
-          amount: parseFloat(payload.total_amount || (payload.payment && payload.payment.amount) || 0),
+          amount: payload.total_amount,
           products: payload.products || [],
           timestamp: Date.now(),
           status: 'pending',
@@ -215,7 +238,8 @@ router.post('/refund', (req, res) => {
 
     const serialNumber = payload.serial_number || 
                          payload.serialNumber || 
-                         (payload.payload && (payload.payload.serial_number || payload.payload.serialNumber));
+                         (payload.pos && payload.pos.posHardwareSerialNumber) ||
+                         (payload.payload && (payload.payload.serial_number || payload.payload.serialNumber || (payload.payload.pos && payload.payload.pos.posHardwareSerialNumber)));
 
     if (!serialNumber) {
       console.warn('Tinda refund received, but no serial number found.');
@@ -268,7 +292,8 @@ router.post('/zreport', (req, res) => {
 
     const serialNumber = payload.serial_number || 
                          payload.serialNumber || 
-                         (payload.payload && (payload.payload.serial_number || payload.payload.serialNumber));
+                         (payload.pos && payload.pos.posHardwareSerialNumber) ||
+                         (payload.payload && (payload.payload.serial_number || payload.payload.serialNumber || (payload.payload.pos && payload.payload.pos.posHardwareSerialNumber)));
 
     if (!serialNumber) {
       console.warn('Tinda Z-Report received, but no serial number found.');
