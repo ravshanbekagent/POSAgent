@@ -429,8 +429,7 @@ router.post('/assign-payment', async (req, res) => {
       return res.status(404).json({ error: 'Pending payment not found' });
     }
 
-    const payment = global.tindaUnassignedCallbacks[paymentIndex];
-
+    try {
       const { Sale, SaleItem, Transaction, StoreVisit } = require('../models');
 
       // Create Sale in DB
