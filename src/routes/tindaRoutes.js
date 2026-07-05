@@ -431,8 +431,7 @@ router.post('/assign-payment', async (req, res) => {
 
     const payment = global.tindaUnassignedCallbacks[paymentIndex];
 
-    try {
-      const { Sale, SaleItem, Transaction } = require('../models');
+      const { Sale, SaleItem, Transaction, StoreVisit } = require('../models');
 
       // Create Sale in DB
       const newSale = await Sale.create({
@@ -487,6 +486,47 @@ router.post('/assign-payment', async (req, res) => {
         amount: payment.amount,
         paid_at: new Date()
       });
+
+      // Find if a visit already exists for this agent and store today, then update/create it
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayTime = new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+        const itemsJson = JSON.stringify((payment.products || []).map(p => ({
+          productName: p.productName || "Mahsulot",
+          qty: p.quantity || 1,
+          price: p.price || 0
+        })));
+
+        const [visit, created] = await StoreVisit.findOrCreate({
+          where: {
+            agent_id: payment.agentId,
+            store_id: parseInt(storeId),
+            date: todayStr
+          },
+          defaults: {
+            agent_id: payment.agentId,
+            store_id: parseInt(storeId),
+            status: 'sold',
+            reason: '',
+            items: itemsJson,
+            date: todayStr,
+            time: todayTime
+          }
+        });
+
+        if (!created) {
+          visit.status = 'sold';
+          visit.reason = '';
+          visit.items = itemsJson;
+          visit.time = todayTime;
+          await visit.save();
+          console.log(`Updated existing visit ID: ${visit.id} to status 'sold'`);
+        } else {
+          console.log(`Created new sold visit ID: ${visit.id}`);
+        }
+      } catch (visitErr) {
+        console.warn("Failed to create/update StoreVisit in DB:", visitErr.message);
+      }
 
     } catch (dbErr) {
       console.warn("DB Sale creation failed, using mock mode fallback:", dbErr.message);
