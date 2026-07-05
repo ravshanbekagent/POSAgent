@@ -34,6 +34,30 @@ const User = sequelize.define('User', {
     allowNull: true,
     unique: true
   },
+  tinda_ip: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  tinda_login: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  tinda_pin: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  tinda_default_mxik: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  tinda_default_package: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  tinda_test_mode: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
   is_active: {
     type: DataTypes.BOOLEAN,
     defaultValue: true

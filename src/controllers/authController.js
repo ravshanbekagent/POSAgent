@@ -13,7 +13,7 @@ if (!global.mockTerminalMappings) {
 
 exports.register = async (req, res) => {
   try {
-    const { username, password, role, phone, name, terminal_sn } = req.body;
+    const { username, password, role, phone, name, terminal_sn, tinda_ip, tinda_login, tinda_pin, tinda_default_mxik, tinda_default_package, tinda_test_mode } = req.body;
 
     const existingUser = await User.findOne({ where: { username } });
     if (existingUser) {
@@ -29,7 +29,13 @@ exports.register = async (req, res) => {
       role,
       phone,
       name,
-      terminal_sn
+      terminal_sn,
+      tinda_ip,
+      tinda_login,
+      tinda_pin,
+      tinda_default_mxik,
+      tinda_default_package,
+      tinda_test_mode
     });
 
     res.status(201).json({
@@ -40,7 +46,13 @@ exports.register = async (req, res) => {
         role: newUser.role,
         phone: newUser.phone,
         name: newUser.name,
-        terminal_sn: newUser.terminal_sn
+        terminal_sn: newUser.terminal_sn,
+        tinda_ip: newUser.tinda_ip,
+        tinda_login: newUser.tinda_login,
+        tinda_pin: newUser.tinda_pin,
+        tinda_default_mxik: newUser.tinda_default_mxik,
+        tinda_default_package: newUser.tinda_default_package,
+        tinda_test_mode: newUser.tinda_test_mode
       }
     });
   } catch (error) {
@@ -75,7 +87,13 @@ exports.login = async (req, res) => {
         username: user.username,
         role: user.role,
         phone: user.phone,
-        terminal_sn: user.terminal_sn
+        terminal_sn: user.terminal_sn,
+        tinda_ip: user.tinda_ip,
+        tinda_login: user.tinda_login,
+        tinda_pin: user.tinda_pin,
+        tinda_default_mxik: user.tinda_default_mxik,
+        tinda_default_package: user.tinda_default_package,
+        tinda_test_mode: user.tinda_test_mode
       }
     });
   } catch (error) {
@@ -111,15 +129,15 @@ exports.login = async (req, res) => {
 exports.getUsers = async (req, res) => {
   try {
     const users = await User.findAll({
-      attributes: ['id', 'username', 'name', 'role', 'phone', 'is_active', 'terminal_sn']
+      attributes: ['id', 'username', 'name', 'role', 'phone', 'is_active', 'terminal_sn', 'tinda_ip', 'tinda_login', 'tinda_pin', 'tinda_default_mxik', 'tinda_default_package', 'tinda_test_mode']
     });
     res.json(users);
   } catch (error) {
     console.warn("DB getUsers query failed, falling back to mock users.");
     const mockUsers = [
-      { id: 1, username: 'admin', name: 'Bosh Admin', role: 'admin', phone: '+998 90 000 00 00', is_active: true, terminal_sn: global.mockTerminalMappings[1] || null },
-      { id: 2, username: 'sherzod_agent', name: 'Sherzod Alimov', role: 'agent', phone: '+998 94 333 22 11', is_active: true, terminal_sn: global.mockTerminalMappings[2] || '2820330855' },
-      { id: 3, username: 'malika_agent', name: 'Malika Qodirova', role: 'agent', phone: '+998 97 777 55 44', is_active: true, terminal_sn: global.mockTerminalMappings[3] || 'TEST-SN-999' }
+      { id: 1, username: 'admin', name: 'Bosh Admin', role: 'admin', phone: '+998 90 000 00 00', is_active: true, terminal_sn: global.mockTerminalMappings[1] || null, tinda_ip: '', tinda_login: '', tinda_pin: '', tinda_default_mxik: '09901001001000000', tinda_default_package: '242030', tinda_test_mode: false },
+      { id: 2, username: 'sherzod_agent', name: 'Sherzod Alimov', role: 'agent', phone: '+998 94 333 22 11', is_active: true, terminal_sn: global.mockTerminalMappings[2] || '2820330855', tinda_ip: '192.168.1.100:8080', tinda_login: 'Sherzod', tinda_pin: '1111', tinda_default_mxik: '09901001001000000', tinda_default_package: '242030', tinda_test_mode: true },
+      { id: 3, username: 'malika_agent', name: 'Malika Qodirova', role: 'agent', phone: '+998 97 777 55 44', is_active: true, terminal_sn: global.mockTerminalMappings[3] || 'TEST-SN-999', tinda_ip: '192.168.1.101:8080', tinda_login: 'Malika', tinda_pin: '2222', tinda_default_mxik: '09901001001000000', tinda_default_package: '242030', tinda_test_mode: true }
     ];
     res.json(mockUsers);
   }
@@ -127,14 +145,14 @@ exports.getUsers = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   const { id } = req.params;
-  const { username, name, phone, password, is_active, role, terminal_sn } = req.body;
+  const { username, name, phone, password, is_active, role, terminal_sn, tinda_ip, tinda_login, tinda_pin, tinda_default_mxik, tinda_default_package, tinda_test_mode } = req.body;
   try {
     const user = await User.findByPk(id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const updates = { username, name, phone, is_active, role, terminal_sn };
+    const updates = { username, name, phone, is_active, role, terminal_sn, tinda_ip, tinda_login, tinda_pin, tinda_default_mxik, tinda_default_package, tinda_test_mode };
 
     if (password) {
       const salt = await bcrypt.genSalt(10);
@@ -149,7 +167,7 @@ exports.updateUser = async (req, res) => {
     global.mockTerminalMappings[id] = terminal_sn;
     res.json({ 
       message: 'User updated successfully (Mock Mode)', 
-      user: { id: parseInt(id), username, name, phone, role, is_active, terminal_sn } 
+      user: { id: parseInt(id), username, name, phone, role, is_active, terminal_sn, tinda_ip, tinda_login, tinda_pin, tinda_default_mxik, tinda_default_package, tinda_test_mode } 
     });
   }
 };
