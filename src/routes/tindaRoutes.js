@@ -175,31 +175,36 @@ router.post('/mock-callback', (req, res) => {
       return res.status(400).json({ success: false, error: 'serialNumber is required' });
     }
 
+    const finalProducts = products || [
+      {
+        productId: 1, // matches our seeded product IQOS Iluma One
+        productName: 'IQOS Iluma One (Pebble Grey)',
+        price: 350000,
+        quantity: 2
+      },
+      {
+        productId: 2, // matches Heets Amber Selection
+        productName: 'Heets Amber Selection',
+        price: 18000,
+        quantity: 50
+      }
+    ];
+
+    const computedTotal = finalProducts.reduce((sum, p) => sum + (parseFloat(p.price || 0) * parseInt(p.quantity || 1)), 0);
+    const finalTotalAmount = totalAmount || computedTotal || 1600000;
+
     // Create a mock payload resembling Tinda's structure
     const mockPayload = {
       sales_id: `MOCK-${Date.now()}`,
       receipt_number: Math.floor(Math.random() * 1000) + 1,
       date: new Date().toISOString(),
       serial_number: serialNumber,
-      total_amount: totalAmount || 11750000,
+      total_amount: finalTotalAmount,
       payment: {
         payment_method: 'by other cashless',
-        amount: totalAmount || 11750000
+        amount: finalTotalAmount
       },
-      products: products || [
-        {
-          productId: 1, // matches our seeded product IQOS Iluma One
-          productName: 'IQOS Iluma One (Pebble Grey)',
-          price: 350000,
-          quantity: 2
-        },
-        {
-          productId: 2, // matches Heets Amber Selection
-          productName: 'Heets Amber Selection',
-          price: 18000,
-          quantity: 50
-        }
-      ]
+      products: finalProducts
     };
 
     global.tindaCallbacks[serialNumber] = {
