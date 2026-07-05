@@ -76,6 +76,35 @@ exports.createSale = async (req, res) => {
 
     await t.commit();
 
+    // Clean up from global.tindaUnassignedCallbacks if present
+    try {
+      if (global.tindaUnassignedCallbacks && global.tindaUnassignedCallbacks.length > 0) {
+        const tindaSalesId = req.body.tinda_sales_id;
+        const tindaReceiptNumber = req.body.tinda_receipt_number;
+        
+        const matchIndex = global.tindaUnassignedCallbacks.findIndex(c => {
+          if (tindaSalesId && c.payload && (c.payload.id === tindaSalesId || c.payload.sales_id === tindaSalesId || c.payload.salePublicId === tindaSalesId)) {
+            return true;
+          }
+          if (tindaReceiptNumber && c.payload && (c.payload.receipt_number === tindaReceiptNumber || c.payload.receiptNumber === tindaReceiptNumber)) {
+            return true;
+          }
+          // Fallback match: same agent, same amount (within 100 sum tolerance), and timestamp within 5 minutes (300000ms)
+          if (c.agentId === agent_id && Math.abs(parseFloat(c.amount) - parseFloat(total_amount)) < 100 && (Date.now() - c.timestamp) < 300000) {
+            return true;
+          }
+          return false;
+        });
+
+        if (matchIndex !== -1) {
+          console.log(`salesController: Removing matched callback ${global.tindaUnassignedCallbacks[matchIndex].id} from unassigned queue.`);
+          global.tindaUnassignedCallbacks.splice(matchIndex, 1);
+        }
+      }
+    } catch (cleanErr) {
+      console.warn("salesController: Failed to clean up from global.tindaUnassignedCallbacks:", cleanErr.message);
+    }
+
     // Trigger Telegram notification in the background
     (async () => {
       try {
@@ -154,6 +183,17 @@ exports.getAgentSales = async (req, res) => {
           model: Transaction,
           as: 'transaction',
           attributes: ['payment_gateway', 'status', 'amount']
+        },
+        {
+          model: SaleItem,
+          as: 'items',
+          include: [
+            {
+              model: Product,
+              as: 'product',
+              attributes: ['barcode', 'name', 'unit', 'price', 'original_price']
+            }
+          ]
         }
       ],
       order: [['createdAt', 'DESC']]

@@ -85,15 +85,15 @@ router.post('/callback', async (req, res) => {
     if (!payload.serial_number && serialNumber) {
       payload.serial_number = serialNumber;
     }
-    if (!payload.products && payload.productList) {
-      payload.products = payload.productList.map(p => ({
-        productId: (p.product && p.product.id) || p.productId || p.id,
-        productName: p.productName || (p.product && p.product.name) || 'Mahsulot',
-        price: parseFloat(p.price || 0),
-        quantity: parseInt(p.amount || p.quantity || 1),
-        barcode: (p.barcodes && p.barcodes[0]) || (p.product && p.product.barcodes && p.product.barcodes[0]) || ''
-      }));
-    }
+    // Normalize products list for frontend and database compatibility
+    const rawProducts = payload.productList || payload.products || [];
+    payload.products = rawProducts.map(p => ({
+      productId: (p.product && p.product.id) || p.productId || p.id,
+      productName: p.productName || (p.product && p.product.name) || 'Mahsulot',
+      price: parseFloat(p.price || 0),
+      quantity: parseInt(p.amount || p.quantity || p.qty || p.count || 1),
+      barcode: (p.barcodes && p.barcodes[0]) || (p.product && p.product.barcodes && p.product.barcodes[0]) || p.barcode || ''
+    }));
     if (!payload.total_amount) {
       payload.total_amount = parseFloat(payload.amount || (payload.payment && payload.payment.amount) || 0);
     }
@@ -449,20 +449,35 @@ router.post('/assign-payment', async (req, res) => {
 
       // Create Sale Items if products exist
       if (payment.products && payment.products.length > 0) {
+        const { Product } = require('../models');
         for (const prod of payment.products) {
+          const barcode = prod.barcode || '';
+          const name = prod.productName || '';
+
+          let localProduct = null;
+          if (barcode) {
+            localProduct = await Product.findOne({ where: { barcode } });
+          }
+          if (!localProduct && name) {
+            localProduct = await Product.findOne({ where: { name } });
+          }
+
+          const resolvedProductId = localProduct ? localProduct.id : 1;
+          const resolvedOriginalPrice = localProduct ? localProduct.original_price : (prod.price || 0);
+
           await SaleItem.create({
             sale_id: newSale.id,
-            product_id: prod.productId || 1, // fallback to product 1
+            product_id: resolvedProductId,
             quantity: prod.quantity || 1,
             unit_price: prod.price || 0,
-            original_price: prod.price || 0
+            original_price: resolvedOriginalPrice
           });
 
           // Deduct inventory
           try {
             const { AgentInventory } = require('../models');
             const inv = await AgentInventory.findOne({
-              where: { agent_id: payment.agentId, product_id: prod.productId || 1 }
+              where: { agent_id: payment.agentId, product_id: resolvedProductId }
             });
             if (inv) {
               inv.stock = Math.max(0, inv.stock - (prod.quantity || 1));

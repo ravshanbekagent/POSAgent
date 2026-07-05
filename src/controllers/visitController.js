@@ -5,6 +5,22 @@ exports.createVisit = async (req, res) => {
     const { store_id, status, reason, items, date, time } = req.body;
     const agent_id = req.user.id; // Extract from authenticated user token
 
+    // Check for existing duplicate visit to prevent double inserts
+    const existingVisit = await StoreVisit.findOne({
+      where: {
+        agent_id,
+        store_id,
+        status,
+        date,
+        time
+      }
+    });
+
+    if (existingVisit) {
+      console.log(`visitController: Duplicate visit detected, returning existing visit ID: ${existingVisit.id}`);
+      return res.status(200).json(existingVisit);
+    }
+
     const newVisit = await StoreVisit.create({
       agent_id,
       store_id,
