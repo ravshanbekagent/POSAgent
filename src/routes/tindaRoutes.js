@@ -158,13 +158,6 @@ router.get('/callback/:serialNumber', (req, res) => {
     // Return and remove from memory so it's only consumed once
     delete global.tindaCallbacks[serialNumber];
 
-    // Clean up corresponding pending unassigned payments since it's now consumed inside cashier screen
-    if (global.tindaUnassignedCallbacks) {
-      global.tindaUnassignedCallbacks = global.tindaUnassignedCallbacks.filter(
-        c => c.serialNumber !== serialNumber
-      );
-    }
-
     console.log(`Callback consumed and cleared for Serial Number: ${serialNumber}`);
     return res.json({ found: true, callback: callbackData.payload });
   } catch (error) {
