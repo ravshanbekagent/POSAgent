@@ -17,6 +17,18 @@ if (!global.tindaWebhookLogs) {
   global.tindaWebhookLogs = [];
 }
 
+// Middleware to parse text/plain string bodies as JSON if applicable
+router.use((req, res, next) => {
+  if (typeof req.body === 'string' && req.body.trim().startsWith('{')) {
+    try {
+      req.body = JSON.parse(req.body);
+    } catch (e) {
+      console.warn('tindaRoutes: Failed to parse plain text body as JSON:', e.message);
+    }
+  }
+  next();
+});
+
 // Helper to look up agent ID by terminal serial number
 async function getAgentIdBySerialNumber(serialNumber) {
   try {
