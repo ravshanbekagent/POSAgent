@@ -111,10 +111,10 @@ router.post('/callback', async (req, res) => {
     if (agentId) {
       const transId = payload.id || payload.salePublicId || payload.sales_id || payload.receipt_number || payload.receiptNumber || `PEND-${Date.now()}`;
       const exists = global.tindaUnassignedCallbacks.some(c => 
-        (c.payload && c.payload.id === payload.id) || 
-        c.payload.sales_id === transId || 
-        c.payload.receipt_number === payload.receipt_number ||
-        c.payload.receiptNumber === payload.receiptNumber
+        (payload.id && c.payload && c.payload.id === payload.id) || 
+        (transId && c.payload && c.payload.sales_id === transId) || 
+        (payload.receipt_number && c.payload && c.payload.receipt_number === payload.receipt_number) ||
+        (payload.receiptNumber && c.payload && c.payload.receiptNumber === payload.receiptNumber)
       );
       if (!exists) {
         global.tindaUnassignedCallbacks.push({
@@ -542,10 +542,10 @@ router.post('/unassign-payment', async (req, res) => {
 
     const transId = payload.id || payload.salePublicId || payload.sales_id || payload.receipt_number || payload.receiptNumber || `PEND-${Date.now()}`;
     const exists = (global.tindaUnassignedCallbacks || []).some(c => 
-      (c.payload && c.payload.id === payload.id) || 
-      c.payload.sales_id === transId || 
-      c.payload.receipt_number === payload.receipt_number ||
-      c.payload.receiptNumber === payload.receiptNumber
+      (payload.id && c.payload && c.payload.id === payload.id) || 
+      (transId && c.payload && c.payload.sales_id === transId) || 
+      (payload.receipt_number && c.payload && c.payload.receipt_number === payload.receipt_number) ||
+      (payload.receiptNumber && c.payload && c.payload.receiptNumber === payload.receiptNumber)
     );
 
     if (!exists) {
