@@ -527,6 +527,51 @@ router.post('/assign-payment', async (req, res) => {
   }
 });
 
+// 12. POST /unassign-payment (Put a payment back into the unassigned queue)
+router.post('/unassign-payment', async (req, res) => {
+  try {
+    const { serialNumber, payload } = req.body;
+    if (!serialNumber || !payload) {
+      return res.status(400).json({ error: 'serialNumber and payload are required' });
+    }
+
+    const agentId = await getAgentIdBySerialNumber(serialNumber);
+    if (!agentId) {
+      return res.status(404).json({ error: 'Agent not found for this terminal serial number' });
+    }
+
+    const transId = payload.id || payload.salePublicId || payload.sales_id || payload.receipt_number || payload.receiptNumber || `PEND-${Date.now()}`;
+    const exists = (global.tindaUnassignedCallbacks || []).some(c => 
+      (c.payload && c.payload.id === payload.id) || 
+      c.payload.sales_id === transId || 
+      c.payload.receipt_number === payload.receipt_number ||
+      c.payload.receiptNumber === payload.receiptNumber
+    );
+
+    if (!exists) {
+      if (!global.tindaUnassignedCallbacks) {
+        global.tindaUnassignedCallbacks = [];
+      }
+      global.tindaUnassignedCallbacks.push({
+        id: `PEND-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        agentId: agentId,
+        serialNumber: serialNumber,
+        amount: parseFloat(payload.total_amount || payload.amount || 0),
+        products: payload.products || [],
+        timestamp: Date.now(),
+        status: 'pending',
+        payload: payload
+      });
+      console.log(`Payment manually put back to unassigned queue for Agent ID: ${agentId}`);
+    }
+
+    return res.json({ success: true, message: 'Payment moved to unassigned queue' });
+  } catch (error) {
+    console.error("Error in unassign-payment:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /debug - Check webhook log history and DB terminal SN assignments
 router.get('/debug', async (req, res) => {
   try {
