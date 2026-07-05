@@ -497,11 +497,18 @@ router.post('/assign-payment', async (req, res) => {
       try {
         const todayStr = new Date().toISOString().split('T')[0];
         const todayTime = new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
-        const itemsJson = JSON.stringify((payment.products || []).map(p => ({
-          productName: p.productName || "Mahsulot",
-          qty: p.quantity || 1,
-          price: p.price || 0
-        })));
+        const itemsData = {
+          products: (payment.products || []).map(p => ({
+            productName: p.productName || "Mahsulot",
+            qty: p.quantity || 1,
+            price: p.price || 0,
+            productId: p.productId || p.id || 1,
+            barcode: p.barcode || '',
+            markedLabel: p.markedLabel || (p.markedLabels && p.markedLabels[0]) || ''
+          })),
+          tindaPayload: payment.payload || null
+        };
+        const itemsJson = JSON.stringify(itemsData);
 
         const [visit, created] = await StoreVisit.findOrCreate({
           where: {
