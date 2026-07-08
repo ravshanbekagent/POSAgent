@@ -20,6 +20,7 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const salesRoutes = require('./routes/salesRoutes');
 const tindaRoutes = require('./routes/tindaRoutes');
 const visitRoutes = require('./routes/visitRoutes');
+const debtRoutes = require('./routes/debtRoutes');
 
 // Mount routes
 app.use('/api/auth', authRoutes);
@@ -29,6 +30,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/tinda', tindaRoutes);
 app.use('/api/visits', visitRoutes);
+app.use('/api/debts', debtRoutes);
 
 // Basic test route
 app.get('/api/health', (req, res) => {
