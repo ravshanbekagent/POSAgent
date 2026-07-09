@@ -192,7 +192,7 @@ exports.getAgentDebts = async (req, res) => {
 
 // 3. Record a payment towards a debt
 exports.recordPayment = async (req, res) => {
-  const { amount } = req.body;
+  const { amount, payment_method } = req.body;
   const debtId = parseInt(req.params.id);
   const agentId = req.user ? req.user.id : 2; // Default to agent 2 if not authenticated in fallback
 
@@ -220,7 +220,8 @@ exports.recordPayment = async (req, res) => {
     await DebtPayment.create({
       debt_id: debtId,
       amount: payVal,
-      agent_id: agentId
+      agent_id: agentId,
+      payment_method: payment_method || 'naqd'
     });
 
     return res.json({ success: true, message: 'Payment recorded successfully', remaining: newRemaining });
@@ -244,7 +245,8 @@ exports.recordPayment = async (req, res) => {
       debt_id: debtId,
       amount: payVal,
       paid_at: new Date().toISOString(),
-      agent_id: agentId
+      agent_id: agentId,
+      payment_method: payment_method || 'naqd'
     });
 
     return res.json({ success: true, message: 'Mock payment recorded successfully', remaining: mockDebt.remaining_amount });

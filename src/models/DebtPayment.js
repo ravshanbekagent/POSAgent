@@ -23,6 +23,11 @@ const DebtPayment = sequelize.define('DebtPayment', {
   agent_id: {
     type: DataTypes.INTEGER,
     allowNull: false
+  },
+  payment_method: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    defaultValue: 'naqd'
   }
 }, {
   tableName: 'debt_payments',

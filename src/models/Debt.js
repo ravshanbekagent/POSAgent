@@ -46,6 +46,14 @@ const Debt = sequelize.define('Debt', {
   status: {
     type: DataTypes.ENUM('pending', 'paid', 'overdue'),
     defaultValue: 'pending'
+  },
+  debtor_name: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  debtor_phone: {
+    type: DataTypes.STRING,
+    allowNull: true
   }
 }, {
   tableName: 'debts',

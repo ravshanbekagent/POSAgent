@@ -76,7 +76,7 @@ exports.createSale = async (req, res) => {
 
     let debt = null;
     if (payment_gateway === 'nasiya') {
-      const { Debt } = require('../models');
+      const { Debt, DebtPayment } = require('../models');
       const todayStr = new Date().toISOString().split('T')[0];
       let dueDateVal = req.body.due_date;
       if (!dueDateVal) {
@@ -84,17 +84,34 @@ exports.createSale = async (req, res) => {
         d.setDate(d.getDate() + 30);
         dueDateVal = d.toISOString().split('T')[0];
       }
+      
+      const initialPaymentVal = parseFloat(req.body.initial_payment || 0);
+      const remainingVal = Math.max(0, total_amount - initialPaymentVal);
+      const statusVal = remainingVal === 0 ? 'paid' : (dueDateVal < todayStr ? 'overdue' : 'pending');
+
       debt = await Debt.create({
         sale_id: sale.id,
         store_id: parseInt(store_id),
         agent_id: agent_id,
         total_amount: total_amount,
-        paid_amount: 0.00,
-        remaining_amount: total_amount,
+        paid_amount: initialPaymentVal,
+        remaining_amount: remainingVal,
         due_date: dueDateVal,
         given_date: todayStr,
-        status: dueDateVal < todayStr ? 'overdue' : 'pending'
+        status: statusVal,
+        debtor_name: req.body.debtor_name || null,
+        debtor_phone: req.body.debtor_phone || null
       }, { transaction: t });
+
+      if (initialPaymentVal > 0) {
+        await DebtPayment.create({
+          debt_id: debt.id,
+          amount: initialPaymentVal,
+          agent_id: agent_id,
+          payment_method: 'naqd',
+          paid_at: new Date().toISOString()
+        }, { transaction: t });
+      }
     }
 
     await t.commit();
@@ -193,20 +210,38 @@ ${itemsListHtml}
         dueDateVal = d.toISOString().split('T')[0];
       }
       
+      const initialPaymentVal = parseFloat(req.body.initial_payment || 0);
+      const remainingVal = Math.max(0, (total_amount || 10000) - initialPaymentVal);
+      const statusVal = remainingVal === 0 ? 'paid' : (dueDateVal < todayStr ? 'overdue' : 'pending');
+
+      const mockPayments = [];
+      if (initialPaymentVal > 0) {
+        mockPayments.push({
+          id: Date.now(),
+          debt_id: Date.now(),
+          amount: initialPaymentVal,
+          paid_at: new Date().toISOString(),
+          agent_id: agent_id,
+          payment_method: 'naqd'
+        });
+      }
+
       const newMockDebt = {
         id: Date.now(),
         sale_id: mockSale.id,
         store_id: parseInt(req.body.store_id || 14489),
         agent_id: agent_id,
         total_amount: total_amount || 10000,
-        paid_amount: 0,
-        remaining_amount: total_amount || 10000,
+        paid_amount: initialPaymentVal,
+        remaining_amount: remainingVal,
         due_date: dueDateVal,
         given_date: todayStr,
-        status: dueDateVal < todayStr ? 'overdue' : 'pending',
+        status: statusVal,
+        debtor_name: req.body.debtor_name || null,
+        debtor_phone: req.body.debtor_phone || null,
         store: { id: parseInt(req.body.store_id || 14489), name: "G'ofur Ota Mini Market", address: "Toshkent sh., Chilonzor 6-daha" },
         agent: { id: agent_id, name: "Sherzod Alimov", username: "sherzod_agent", phone: "+998 94 333 22 11" },
-        payments: [],
+        payments: mockPayments,
         sale: {
           id: mockSale.id,
           total_amount: total_amount || 10000,
