@@ -3,17 +3,21 @@ const { sendTelegramNotification } = require('../utils/telegram');
 
 exports.createSale = async (req, res) => {
   let t;
+  let items = [];
+  let total_amount = 0;
+  let agent_id = req.user ? req.user.id : null;
   try {
     t = await sequelize.transaction();
-    const agent_id = req.user.id;
-    const { store_id, items, payment_gateway } = req.body;
+    agent_id = req.user.id;
+    const { store_id, payment_gateway } = req.body;
+    items = req.body.items;
 
     if (!store_id || !items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Store ID and items are required' });
     }
 
     const today = new Date().toISOString().split('T')[0];
-    let total_amount = 0;
+    total_amount = 0;
 
     for (const item of items) {
       const { product_id, quantity } = item;
