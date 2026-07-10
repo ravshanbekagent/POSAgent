@@ -253,6 +253,11 @@ ${itemsListHtml}
     });
   } catch (error) {
     if (t) await t.rollback();
+    global.lastDbError = {
+      message: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    };
     console.warn("DB createSale transaction failed, falling back to mock sale success:", error.message);
     const mockSale = { id: `MOCK-SALE-${Date.now()}`, total_amount: total_amount || 10000, status: 'completed' };
     const mockTransaction = { id: `MOCK-TX-${Date.now()}`, payment_gateway: req.body.payment_gateway || 'click', status: 'completed' };
