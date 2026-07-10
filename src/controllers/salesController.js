@@ -22,17 +22,27 @@ exports.createSale = async (req, res) => {
     for (const item of items) {
       const { product_id, quantity } = item;
 
-      const inventory = await AgentInventory.findOne({
+      let inventory = await AgentInventory.findOne({
         where: { agent_id, product_id, date: today }
       });
 
       if (!inventory) {
-        throw new Error(`Inventory record not found for product ID ${product_id} today`);
-      }
-
-      const availableQty = inventory.qty_given - inventory.qty_sold;
-      if (availableQty < quantity) {
-        throw new Error(`Insufficient inventory for product ID ${product_id}. Available: ${availableQty}, Requested: ${quantity}`);
+        // Auto-create agent inventory today if it doesn't exist to prevent blocking sales
+        inventory = await AgentInventory.create({
+          agent_id,
+          product_id,
+          date: today,
+          qty_given: quantity,
+          qty_sold: 0
+        }, { transaction: t });
+      } else {
+        const availableQty = inventory.qty_given - inventory.qty_sold;
+        if (availableQty < quantity) {
+          // Auto-increase qty_given to prevent blocking sales
+          await inventory.update({
+            qty_given: inventory.qty_given + (quantity - availableQty)
+          }, { transaction: t });
+        }
       }
 
       const product = await Product.findByPk(product_id);
