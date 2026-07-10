@@ -62,7 +62,8 @@ exports.createVisit = async (req, res) => {
               product_id: prodId,
               quantity: qty,
               unit_price: price,
-              original_price: originalPrice
+              original_price: originalPrice,
+              subtotal: qty * price
             });
 
             await product.update({
@@ -91,7 +92,7 @@ exports.createVisit = async (req, res) => {
         await Transaction.create({
           sale_id: sale.id,
           payment_gateway: paymentMethod,
-          status: 'completed',
+          status: 'paid',
           amount: total_amount
         }, { transaction: t });
 
