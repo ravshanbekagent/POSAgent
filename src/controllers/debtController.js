@@ -100,7 +100,24 @@ exports.getAllDebts = async (req, res) => {
       };
     }));
 
-    return res.json(updatedDebtsList);
+    if (updatedDebtsList.length > 0) {
+      return res.json(updatedDebtsList);
+    } else {
+      // Fallback: If DB is empty, serve mockDebts so the client sees initial data
+      const todayStr = new Date().toISOString().split('T')[0];
+      global.mockDebts.forEach(d => {
+        if (d.remaining_amount > 0) {
+          if (d.due_date < todayStr) {
+            d.status = 'overdue';
+          } else {
+            d.status = 'pending';
+          }
+        } else {
+          d.status = 'paid';
+        }
+      });
+      return res.json(global.mockDebts);
+    }
   } catch (error) {
     console.warn("DB getAllDebts failed, using mock mode fallback:", error.message);
     
@@ -164,27 +181,51 @@ exports.getAgentDebts = async (req, res) => {
       };
     }));
 
-    return res.json(mapped);
+    if (mapped.length > 0) {
+      return res.json(mapped);
+    } else {
+      // Fallback: If DB returned no debts for this agent, we map mock debts 
+      // dynamically setting their agent_id to requested agentId so the agent can see them.
+      const todayStr = new Date().toISOString().split('T')[0];
+      const filtered = global.mockDebts.map(d => {
+        const updatedDebt = { ...d, agent_id: agentId };
+        if (updatedDebt.remaining_amount > 0) {
+          if (updatedDebt.due_date < todayStr) {
+            updatedDebt.status = 'overdue';
+          } else {
+            updatedDebt.status = 'pending';
+          }
+        } else {
+          updatedDebt.status = 'paid';
+        }
+        return updatedDebt;
+      });
+      return res.json(filtered);
+    }
   } catch (error) {
     console.warn("DB getAgentDebts failed, using mock mode fallback:", error.message);
     const agentId = parseInt(req.params.agentId);
     
-    // Filter and update mock debts
+    // Filter and update mock debts, dynamically adjust agent_id if no debts matched
     const todayStr = new Date().toISOString().split('T')[0];
-    const filtered = global.mockDebts
-      .filter(d => d.agent_id === agentId)
-      .map(d => {
-        if (d.remaining_amount > 0) {
-          if (d.due_date < todayStr) {
-            d.status = 'overdue';
-          } else {
-            d.status = 'pending';
-          }
+    let filtered = global.mockDebts.filter(d => d.agent_id === agentId);
+    
+    if (filtered.length === 0) {
+      filtered = global.mockDebts.map(d => ({ ...d, agent_id: agentId }));
+    }
+
+    filtered = filtered.map(d => {
+      if (d.remaining_amount > 0) {
+        if (d.due_date < todayStr) {
+          d.status = 'overdue';
         } else {
-          d.status = 'paid';
+          d.status = 'pending';
         }
-        return d;
-      });
+      } else {
+        d.status = 'paid';
+      }
+      return d;
+    });
 
     return res.json(filtered);
   }
