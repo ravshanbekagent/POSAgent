@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { TindaCallback } = require('../models');
 
 // In-memory storage for active callbacks
 // Structure: { [serialNumber]: { payload, timestamp } }
@@ -110,24 +111,29 @@ router.post('/callback', async (req, res) => {
     const agentId = await getAgentIdBySerialNumber(serialNumber);
     if (agentId) {
       const transId = payload.id || payload.salePublicId || payload.sales_id || payload.receipt_number || payload.receiptNumber || `PEND-${Date.now()}`;
-      const exists = global.tindaUnassignedCallbacks.some(c => 
-        (payload.id && c.payload && c.payload.id === payload.id) || 
-        (transId && c.payload && c.payload.sales_id === transId) || 
-        (payload.receipt_number && c.payload && c.payload.receipt_number === payload.receipt_number) ||
-        (payload.receiptNumber && c.payload && c.payload.receiptNumber === payload.receiptNumber)
-      );
+      
+      const { Op } = require('sequelize');
+      const exists = await TindaCallback.findOne({
+        where: {
+          [Op.or]: [
+            { id: String(transId) },
+            { payload: { [Op.like]: `%${transId}%` } }
+          ]
+        }
+      });
+
       if (!exists) {
-        global.tindaUnassignedCallbacks.push({
-          id: `PEND-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          agentId: agentId,
-          serialNumber: serialNumber,
+        const callbackId = `PEND-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        await TindaCallback.create({
+          id: callbackId,
+          agent_id: agentId,
+          serial_number: serialNumber,
           amount: payload.total_amount,
-          products: payload.products || [],
-          timestamp: Date.now(),
+          products: JSON.stringify(payload.products || []),
           status: 'pending',
-          payload: payload
+          payload: JSON.stringify(payload)
         });
-        console.log(`Unassigned payment added to queue for Agent ID: ${agentId}`);
+        console.log(`Unassigned payment saved to DB for Agent ID: ${agentId}, Callback ID: ${callbackId}`);
       }
     }
 
@@ -407,12 +413,34 @@ router.post('/mock-zreport', (req, res) => {
 });
 
 // 10. GET /pending-payments/:agentId (Get unassigned terminal payments for an agent)
-router.get('/pending-payments/:agentId', (req, res) => {
+router.get('/pending-payments/:agentId', async (req, res) => {
   try {
     const agentId = parseInt(req.params.agentId);
-    const pending = (global.tindaUnassignedCallbacks || []).filter(
-      c => c.agentId === agentId && c.status === 'pending'
-    );
+    const callbacks = await TindaCallback.findAll({
+      where: {
+        agent_id: agentId,
+        status: 'pending'
+      }
+    });
+
+    const pending = callbacks.map(c => {
+      let parsedProducts = [];
+      let parsedPayload = {};
+      try { parsedProducts = JSON.parse(c.products || '[]'); } catch(e) {}
+      try { parsedPayload = JSON.parse(c.payload || '{}'); } catch(e) {}
+
+      return {
+        id: c.id,
+        agentId: c.agent_id,
+        serialNumber: c.serial_number,
+        amount: parseFloat(c.amount),
+        products: parsedProducts,
+        status: c.status,
+        payload: parsedPayload,
+        createdAt: c.createdAt
+      };
+    });
+
     return res.json(pending);
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -427,14 +455,32 @@ router.post('/assign-payment', async (req, res) => {
       return res.status(400).json({ error: 'paymentId and storeId are required' });
     }
 
-    const paymentIndex = (global.tindaUnassignedCallbacks || []).findIndex(
-      c => c.id === paymentId
-    );
-    if (paymentIndex === -1) {
-      return res.status(404).json({ error: 'Pending payment not found' });
-    }
+    const dbCallback = await TindaCallback.findByPk(paymentId);
+    let payment = null;
 
-    const payment = global.tindaUnassignedCallbacks[paymentIndex];
+    if (dbCallback) {
+      let parsedProducts = [];
+      let parsedPayload = {};
+      try { parsedProducts = JSON.parse(dbCallback.products || '[]'); } catch(e) {}
+      try { parsedPayload = JSON.parse(dbCallback.payload || '{}'); } catch(e) {}
+      payment = {
+        id: dbCallback.id,
+        agentId: dbCallback.agent_id,
+        serialNumber: dbCallback.serial_number,
+        amount: parseFloat(dbCallback.amount),
+        products: parsedProducts,
+        status: dbCallback.status,
+        payload: parsedPayload
+      };
+    } else {
+      const fallbackIndex = (global.tindaUnassignedCallbacks || []).findIndex(
+        c => c.id === paymentId
+      );
+      if (fallbackIndex === -1) {
+        return res.status(404).json({ error: 'Pending payment not found' });
+      }
+      payment = global.tindaUnassignedCallbacks[fallbackIndex];
+    }
 
     try {
       const { Sale, SaleItem, Transaction, StoreVisit } = require('../models');
@@ -579,7 +625,15 @@ router.post('/assign-payment', async (req, res) => {
     }
 
     // Remove from unassigned queue
-    global.tindaUnassignedCallbacks.splice(paymentIndex, 1);
+    if (dbCallback) {
+      await dbCallback.destroy();
+    }
+    const fallbackIdx = (global.tindaUnassignedCallbacks || []).findIndex(
+      c => c.id === paymentId
+    );
+    if (fallbackIdx !== -1) {
+      global.tindaUnassignedCallbacks.splice(fallbackIdx, 1);
+    }
 
     return res.json({ success: true, message: 'Payment successfully assigned and sale registered' });
   } catch (error) {
@@ -601,20 +655,33 @@ router.post('/unassign-payment', async (req, res) => {
       return res.status(404).json({ error: 'Agent not found for this terminal serial number' });
     }
 
-    const transId = payload.id || payload.salePublicId || payload.sales_id || payload.receipt_number || payload.receiptNumber || `PEND-${Date.now()}`;
-    const exists = (global.tindaUnassignedCallbacks || []).some(c => 
-      (payload.id && c.payload && c.payload.id === payload.id) || 
-      (transId && c.payload && c.payload.sales_id === transId) || 
-      (payload.receipt_number && c.payload && c.payload.receipt_number === payload.receipt_number) ||
-      (payload.receiptNumber && c.payload && c.payload.receiptNumber === payload.receiptNumber)
-    );
+    const { Op } = require('sequelize');
+    const dbExists = await TindaCallback.findOne({
+      where: {
+        [Op.or]: [
+          { id: String(transId) },
+          { payload: { [Op.like]: `%${transId}%` } }
+        ]
+      }
+    });
 
-    if (!exists) {
+    if (!dbExists) {
+      const callbackId = `PEND-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      await TindaCallback.create({
+        id: callbackId,
+        agent_id: agentId,
+        serial_number: serialNumber,
+        amount: parseFloat(payload.total_amount || payload.amount || 0),
+        products: JSON.stringify(payload.products || []),
+        status: 'pending',
+        payload: JSON.stringify(payload)
+      });
+
       if (!global.tindaUnassignedCallbacks) {
         global.tindaUnassignedCallbacks = [];
       }
       global.tindaUnassignedCallbacks.push({
-        id: `PEND-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        id: callbackId,
         agentId: agentId,
         serialNumber: serialNumber,
         amount: parseFloat(payload.total_amount || payload.amount || 0),
@@ -623,7 +690,7 @@ router.post('/unassign-payment', async (req, res) => {
         status: 'pending',
         payload: payload
       });
-      console.log(`Payment manually put back to unassigned queue for Agent ID: ${agentId}`);
+      console.log(`Payment manually put back to unassigned queue in DB & global for Agent ID: ${agentId}`);
     }
 
     return res.json({ success: true, message: 'Payment moved to unassigned queue' });

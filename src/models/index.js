@@ -8,6 +8,7 @@ const Transaction = require('./Transaction');
 const StoreVisit = require('./StoreVisit');
 const Debt = require('./Debt');
 const DebtPayment = require('./DebtPayment');
+const TindaCallback = require('./TindaCallback');
 
 // Define associations
 
@@ -78,6 +79,7 @@ module.exports = {
   Transaction,
   StoreVisit,
   Debt,
-  DebtPayment
+  DebtPayment,
+  TindaCallback
 };
 

@@ -1,4 +1,4 @@
-const { sequelize, Sale, SaleItem, Transaction, AgentInventory, Product, Store } = require('../models');
+const { sequelize, Sale, SaleItem, Transaction, AgentInventory, Product, Store, TindaCallback } = require('../models');
 const { sendTelegramNotification } = require('../utils/telegram');
 
 exports.createSale = async (req, res) => {
@@ -130,33 +130,75 @@ exports.createSale = async (req, res) => {
 
     await t.commit();
 
-    // Clean up from global.tindaUnassignedCallbacks if present
+    // Clean up from TindaCallback (DB) and global.tindaUnassignedCallbacks if present
     try {
-      if (global.tindaUnassignedCallbacks && global.tindaUnassignedCallbacks.length > 0) {
-        const tindaSalesId = req.body.tinda_sales_id;
-        const tindaReceiptNumber = req.body.tinda_receipt_number;
-        
-        const matchIndex = global.tindaUnassignedCallbacks.findIndex(c => {
-          if (tindaSalesId && c.payload && (c.payload.id === tindaSalesId || c.payload.sales_id === tindaSalesId || c.payload.salePublicId === tindaSalesId)) {
-            return true;
-          }
-          if (tindaReceiptNumber && c.payload && (c.payload.receipt_number === tindaReceiptNumber || c.payload.receiptNumber === tindaReceiptNumber)) {
-            return true;
-          }
-          // Fallback match: same agent, same amount (within 100 sum tolerance), and timestamp within 5 minutes (300000ms)
-          if (c.agentId === agent_id && Math.abs(parseFloat(c.amount) - parseFloat(total_amount)) < 100 && (Date.now() - c.timestamp) < 300000) {
-            return true;
-          }
-          return false;
-        });
+      const tindaSalesId = req.body.tinda_sales_id;
+      const tindaReceiptNumber = req.body.tinda_receipt_number;
 
-        if (matchIndex !== -1) {
-          console.log(`salesController: Removing matched callback ${global.tindaUnassignedCallbacks[matchIndex].id} from unassigned queue.`);
-          global.tindaUnassignedCallbacks.splice(matchIndex, 1);
+      // 1. Clean from DB
+      const { Op } = require('sequelize');
+      let dbMatch = null;
+      
+      if (tindaSalesId) {
+        dbMatch = await TindaCallback.findOne({
+          where: {
+            [Op.or]: [
+              { id: String(tindaSalesId) },
+              { payload: { [Op.like]: `%${tindaSalesId}%` } }
+            ]
+          }
+        });
+      }
+      
+      if (!dbMatch && tindaReceiptNumber) {
+        dbMatch = await TindaCallback.findOne({
+          where: {
+            payload: { [Op.like]: `%${tindaReceiptNumber}%` }
+          }
+        });
+      }
+
+      if (!dbMatch) {
+        // Fallback match: same agent, same amount, and created within last 5 minutes
+        const fiveMinsAgo = new Date(Date.now() - 300000);
+        dbMatch = await TindaCallback.findOne({
+          where: {
+            agent_id: agent_id,
+            amount: { [Op.between]: [parseFloat(total_amount) - 100, parseFloat(total_amount) + 100] },
+            createdAt: { [Op.gte]: fiveMinsAgo }
+          }
+        });
+      }
+
+      if (dbMatch) {
+        console.log(`salesController: Removing matched callback ${dbMatch.id} from DB.`);
+        const matchedId = dbMatch.id;
+        await dbMatch.destroy();
+
+        // Also clean from global memory if present
+        if (global.tindaUnassignedCallbacks && global.tindaUnassignedCallbacks.length > 0) {
+          const matchIdx = global.tindaUnassignedCallbacks.findIndex(c => c.id === matchedId);
+          if (matchIdx !== -1) {
+            global.tindaUnassignedCallbacks.splice(matchIdx, 1);
+          }
+        }
+      } else {
+        // Fallback clean from global memory if DB search yielded nothing
+        if (global.tindaUnassignedCallbacks && global.tindaUnassignedCallbacks.length > 0) {
+          const matchIndex = global.tindaUnassignedCallbacks.findIndex(c => {
+            if (tindaSalesId && c.payload && (c.payload.id === tindaSalesId || c.payload.sales_id === tindaSalesId || c.payload.salePublicId === tindaSalesId)) return true;
+            if (tindaReceiptNumber && c.payload && (c.payload.receipt_number === tindaReceiptNumber || c.payload.receiptNumber === tindaReceiptNumber)) return true;
+            if (c.agentId === agent_id && Math.abs(parseFloat(c.amount) - parseFloat(total_amount)) < 100 && (Date.now() - c.timestamp) < 300000) return true;
+            return false;
+          });
+          if (matchIndex !== -1) {
+            console.log(`salesController: Removing matched callback ${global.tindaUnassignedCallbacks[matchIndex].id} from unassigned memory queue.`);
+            global.tindaUnassignedCallbacks.splice(matchIndex, 1);
+          }
         }
       }
     } catch (cleanErr) {
-      console.warn("salesController: Failed to clean up from global.tindaUnassignedCallbacks:", cleanErr.message);
+      console.warn("salesController: Failed to clean up from TindaCallback (DB/Memory):", cleanErr.message);
     }
 
     // Trigger Telegram notification in the background
