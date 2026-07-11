@@ -117,6 +117,11 @@ exports.recordPayment = async (req, res) => {
     }
 
     const payVal = parseFloat(amount);
+    const remaining = parseFloat(debt.remaining_amount);
+    if (payVal > remaining) {
+      return res.status(400).json({ error: `Payment amount (${payVal.toLocaleString()} UZS) cannot exceed the remaining debt (${remaining.toLocaleString()} UZS)` });
+    }
+
     const newPaid = parseFloat(debt.paid_amount) + payVal;
     const newRemaining = Math.max(0, parseFloat(debt.total_amount) - newPaid);
     const newStatus = newRemaining === 0 ? 'paid' : (debt.due_date < new Date().toISOString().split('T')[0] ? 'overdue' : 'pending');
