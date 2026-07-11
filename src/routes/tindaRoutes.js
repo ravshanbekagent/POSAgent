@@ -720,7 +720,6 @@ router.get('/debug', async (req, res) => {
       webhookLogs: global.tindaWebhookLogs,
       activeCallbacks: global.tindaCallbacks,
       mockTerminalMappings: global.mockTerminalMappings,
-      lastDbError: global.lastDbError || null,
       usersInDb: users,
       serverTime: new Date().toISOString()
     });

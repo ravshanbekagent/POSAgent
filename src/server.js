@@ -33,8 +33,13 @@ app.use('/api/visits', visitRoutes);
 app.use('/api/debts', debtRoutes);
 
 // Basic test route
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'API is running' });
+app.get('/api/health', async (req, res) => {
+  try {
+    await sequelize.authenticate();
+    res.json({ status: 'OK', database: 'Connected', message: 'API is running' });
+  } catch (err) {
+    res.json({ status: 'ERROR', database: 'Disconnected', error: err.message, message: 'API is running in mock mode' });
+  }
 });
 
 const bcrypt = require('bcryptjs');
