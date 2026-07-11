@@ -36,7 +36,7 @@ exports.createVisit = async (req, res) => {
     }, { transaction: t });
 
     // 2. If the visit is a sale, also record the sale and potential debt online in DB
-    if (status === 'sold' && items) {
+    if (status === 'sold' && items && !req.body.sale_recorded && !req.body.skip_sale_creation) {
       const parsed = typeof items === 'string' ? JSON.parse(items) : items;
       const products = parsed.products || [];
       const paymentMethod = (parsed.paymentMethod || 'naqd').toLowerCase();
