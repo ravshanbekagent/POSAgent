@@ -10,11 +10,42 @@ exports.createSale = async (req, res) => {
     t = await sequelize.transaction();
     agent_id = req.user.id;
     const { store_id, payment_gateway } = req.body;
-    items = req.body.items;
+    const inputItems = req.body.items;
 
-    if (!store_id || !items || !Array.isArray(items) || items.length === 0) {
+    if (!store_id || !inputItems || !Array.isArray(inputItems) || inputItems.length === 0) {
       return res.status(400).json({ error: 'Store ID and items are required' });
     }
+
+    const store = await Store.findByPk(store_id, { transaction: t });
+    if (!store) {
+      await t.rollback();
+      return res.status(404).json({ error: `Store with ID ${store_id} not found` });
+    }
+    const agent = await User.findByPk(agent_id, { transaction: t });
+    if (!agent) {
+      await t.rollback();
+      return res.status(404).json({ error: `Agent with ID ${agent_id} not found` });
+    }
+
+    // Merge items with duplicate product_ids to prevent unique constraint conflicts
+    const mergedMap = new Map();
+    for (const item of inputItems) {
+      const pid = parseInt(item.product_id);
+      const qty = parseInt(item.quantity || item.qty || 1);
+      const price = parseFloat(item.unit_price || 0);
+      if (mergedMap.has(pid)) {
+        const existing = mergedMap.get(pid);
+        existing.quantity += qty;
+        existing.unit_price = price;
+      } else {
+        mergedMap.set(pid, {
+          product_id: pid,
+          quantity: qty,
+          unit_price: price
+        });
+      }
+    }
+    items = Array.from(mergedMap.values());
 
     const today = new Date().toISOString().split('T')[0];
     total_amount = 0;
