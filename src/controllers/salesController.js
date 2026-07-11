@@ -23,7 +23,8 @@ exports.createSale = async (req, res) => {
       const { product_id, quantity } = item;
 
       let inventory = await AgentInventory.findOne({
-        where: { agent_id, product_id, date: today }
+        where: { agent_id, product_id, date: today },
+        transaction: t
       });
 
       if (!inventory) {
@@ -45,7 +46,7 @@ exports.createSale = async (req, res) => {
         }
       }
 
-      const product = await Product.findByPk(product_id);
+      const product = await Product.findByPk(product_id, { transaction: t });
       if (!product) {
         throw new Error(`Product ID ${product_id} not found`);
       }
@@ -73,7 +74,8 @@ exports.createSale = async (req, res) => {
       }, { transaction: t });
 
       const inventory = await AgentInventory.findOne({
-        where: { agent_id, product_id, date: today }
+        where: { agent_id, product_id, date: today },
+        transaction: t
       });
 
       await inventory.update({
@@ -253,74 +255,8 @@ ${itemsListHtml}
     });
   } catch (error) {
     if (t) await t.rollback();
-    console.warn("DB createSale transaction failed, falling back to mock sale success:", error.message);
-    const mockSale = { id: `MOCK-SALE-${Date.now()}`, total_amount: total_amount || 10000, status: 'completed' };
-    const mockTransaction = { id: `MOCK-TX-${Date.now()}`, payment_gateway: req.body.payment_gateway || 'click', status: 'completed' };
-    
-    if ((req.body.payment_gateway || '').toLowerCase() === 'nasiya') {
-      const todayStr = new Date().toISOString().split('T')[0];
-      let dueDateVal = req.body.due_date;
-      if (!dueDateVal) {
-        const d = new Date();
-        d.setDate(d.getDate() + 30);
-        dueDateVal = d.toISOString().split('T')[0];
-      }
-      
-      const initialPaymentVal = parseFloat(req.body.initial_payment || 0);
-      const remainingVal = Math.max(0, (total_amount || 10000) - initialPaymentVal);
-      const statusVal = remainingVal === 0 ? 'paid' : (dueDateVal < todayStr ? 'overdue' : 'pending');
-
-      const mockPayments = [];
-      if (initialPaymentVal > 0) {
-        mockPayments.push({
-          id: Date.now(),
-          debt_id: Date.now(),
-          amount: initialPaymentVal,
-          paid_at: new Date().toISOString(),
-          agent_id: agent_id,
-          payment_method: 'naqd'
-        });
-      }
-
-      const newMockDebt = {
-        id: Date.now(),
-        sale_id: mockSale.id,
-        store_id: parseInt(req.body.store_id || 14489),
-        agent_id: agent_id,
-        total_amount: total_amount || 10000,
-        paid_amount: initialPaymentVal,
-        remaining_amount: remainingVal,
-        due_date: dueDateVal,
-        given_date: todayStr,
-        status: statusVal,
-        debtor_name: req.body.debtor_name || null,
-        debtor_phone: req.body.debtor_phone || null,
-        store: { id: parseInt(req.body.store_id || 14489), name: "G'ofur Ota Mini Market", address: "Toshkent sh., Chilonzor 6-daha" },
-        agent: { id: agent_id, name: "Sherzod Alimov", username: "sherzod_agent", phone: "+998 94 333 22 11" },
-        payments: mockPayments,
-        sale: {
-          id: mockSale.id,
-          total_amount: total_amount || 10000,
-          items: (items || []).map((it, idx) => ({
-            id: idx + 1,
-            product_id: it.product_id,
-            quantity: it.quantity,
-            unit_price: it.unit_price,
-            product: { name: `Mahsulot ${it.product_id}`, unit: "dona" }
-          }))
-        }
-      };
-
-      if (!global.mockDebts) global.mockDebts = [];
-      global.mockDebts.unshift(newMockDebt);
-      console.log('Created new mock debt entry:', newMockDebt.id);
-    }
-
-    res.status(201).json({
-      message: 'Sale created successfully. (Mock Mode)',
-      sale: mockSale,
-      transaction: mockTransaction
-    });
+    console.error("DB createSale transaction failed:", error.message);
+    res.status(500).json({ error: error.message });
   }
 };
 
