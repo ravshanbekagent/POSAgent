@@ -44,6 +44,21 @@ exports.getAllDebts = async (req, res) => {
       };
     }));
 
+    // Merge mock debts from memory if present
+    if (global.mockDebts && global.mockDebts.length > 0) {
+      global.mockDebts.forEach(mock => {
+        const exists = updatedDebtsList.some(d => String(d.sale_id) === String(mock.sale_id) || String(d.id) === String(mock.id));
+        if (!exists) {
+          updatedDebtsList.unshift({
+            ...mock,
+            total_amount: parseFloat(mock.total_amount),
+            paid_amount: parseFloat(mock.paid_amount),
+            remaining_amount: parseFloat(mock.remaining_amount)
+          });
+        }
+      });
+    }
+
     return res.json(updatedDebtsList);
   } catch (error) {
     console.error("DB getAllDebts failed:", error.message);
@@ -92,6 +107,23 @@ exports.getAgentDebts = async (req, res) => {
         status
       };
     }));
+
+    // Merge mock debts for this agent from memory if present
+    if (global.mockDebts && global.mockDebts.length > 0) {
+      global.mockDebts.forEach(mock => {
+        if (parseInt(mock.agent_id) === agentId) {
+          const exists = mapped.some(d => String(d.sale_id) === String(mock.sale_id) || String(d.id) === String(mock.id));
+          if (!exists) {
+            mapped.unshift({
+              ...mock,
+              total_amount: parseFloat(mock.total_amount),
+              paid_amount: parseFloat(mock.paid_amount),
+              remaining_amount: parseFloat(mock.remaining_amount)
+            });
+          }
+        }
+      });
+    }
 
     return res.json(mapped);
   } catch (error) {
