@@ -703,7 +703,7 @@ router.post('/unassign-payment', async (req, res) => {
 // GET /debug - Check webhook log history and DB terminal SN assignments
 router.get('/debug', async (req, res) => {
   try {
-    const { User } = require('../models');
+    const { User, Debt, StoreVisit, Store } = require('../models');
     let users = [];
     try {
       users = await User.findAll({
@@ -711,6 +711,32 @@ router.get('/debug', async (req, res) => {
       });
     } catch (err) {
       users = `DB lookup failed: ${err.message}`;
+    }
+
+    let debtsCount = 0;
+    let lastDebts = [];
+    try {
+      debtsCount = await Debt.count();
+      lastDebts = await Debt.findAll({
+        limit: 10,
+        order: [['createdAt', 'DESC']],
+        include: [{ model: Store, as: 'store', attributes: ['name'] }]
+      });
+    } catch (err) {
+      lastDebts = `DB debts query failed: ${err.message}`;
+    }
+
+    let visitsCount = 0;
+    let lastVisits = [];
+    try {
+      visitsCount = await StoreVisit.count();
+      lastVisits = await StoreVisit.findAll({
+        limit: 10,
+        order: [['createdAt', 'DESC']],
+        include: [{ model: Store, as: 'store', attributes: ['name'] }]
+      });
+    } catch (err) {
+      lastVisits = `DB visits query failed: ${err.message}`;
     }
 
     return res.json({
@@ -721,6 +747,10 @@ router.get('/debug', async (req, res) => {
       activeCallbacks: global.tindaCallbacks,
       mockTerminalMappings: global.mockTerminalMappings,
       usersInDb: users,
+      debtsCount,
+      lastDebts,
+      visitsCount,
+      lastVisits,
       serverTime: new Date().toISOString()
     });
   } catch (error) {
