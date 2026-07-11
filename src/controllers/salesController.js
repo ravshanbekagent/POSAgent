@@ -1,4 +1,4 @@
-const { sequelize, Sale, SaleItem, Transaction, AgentInventory, Product, Store, TindaCallback } = require('../models');
+const { sequelize, Sale, SaleItem, Transaction, AgentInventory, Product, Store, TindaCallback, User } = require('../models');
 const { sendTelegramNotification } = require('../utils/telegram');
 
 exports.createSale = async (req, res) => {
