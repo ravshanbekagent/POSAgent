@@ -186,3 +186,74 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.resetAgentHistory = async (req, res) => {
+  const { agentId } = req.params;
+  try {
+    const { Sale, SaleItem, Transaction, StoreVisit, AgentInventory, TindaCallback } = require('../models');
+    
+    const sales = await Sale.findAll({ where: { agent_id: agentId } });
+    const saleIds = sales.map(s => s.id);
+
+    if (saleIds.length > 0) {
+      await SaleItem.destroy({ where: { sale_id: saleIds } });
+      await Transaction.destroy({ where: { sale_id: saleIds } });
+    }
+    await Sale.destroy({ where: { agent_id: agentId } });
+    await StoreVisit.destroy({ where: { agent_id: agentId } });
+    await AgentInventory.destroy({ where: { agent_id: agentId } });
+    await TindaCallback.destroy({ where: { agent_id: agentId } });
+
+    res.json({ success: true, message: 'Agent tarixi muvaffaqiyatli tozalandi.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.resetAgentDebts = async (req, res) => {
+  const { agentId } = req.params;
+  try {
+    const { Debt, DebtPayment } = require('../models');
+    
+    const debts = await Debt.findAll({ where: { agent_id: agentId } });
+    const debtIds = debts.map(d => d.id);
+
+    if (debtIds.length > 0) {
+      await DebtPayment.destroy({ where: { debt_id: debtIds } });
+    }
+    await Debt.destroy({ where: { agent_id: agentId } });
+    await DebtPayment.destroy({ where: { agent_id: agentId } });
+
+    res.json({ success: true, message: 'Agent nasiyalari muvaffaqiyatli tozalandi.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.factoryReset = async (req, res) => {
+  try {
+    const { seedDatabase } = require('../utils/seeder');
+    const { User, Product, Store, Sale, SaleItem, Transaction, StoreVisit, AgentInventory, TindaCallback, Debt, DebtPayment } = require('../models');
+
+    // Drop/delete in correct foreign key order
+    await DebtPayment.destroy({ where: {}, truncate: false });
+    await Debt.destroy({ where: {}, truncate: false });
+    await Transaction.destroy({ where: {}, truncate: false });
+    await SaleItem.destroy({ where: {}, truncate: false });
+    await Sale.destroy({ where: {}, truncate: false });
+    await StoreVisit.destroy({ where: {}, truncate: false });
+    await AgentInventory.destroy({ where: {}, truncate: false });
+    await TindaCallback.destroy({ where: {}, truncate: false });
+    await Store.destroy({ where: {}, truncate: false });
+    await Product.destroy({ where: {}, truncate: false });
+    await User.destroy({ where: {}, truncate: false });
+
+    // Seed database with default admin, agents, products and stores
+    await seedDatabase();
+
+    res.json({ success: true, message: 'Butun tizim ma\'lumotlari tozalandi va dastlabki holatga qaytarildi (Factory Reset).' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
