@@ -48,14 +48,32 @@ exports.createSale = async (req, res) => {
     items = Array.from(mergedMap.values());
 
     const today = new Date().toISOString().split('T')[0];
+    const todayDate = new Date(today);
+    todayDate.setHours(0, 0, 0, 0);
     total_amount = 0;
 
     for (const item of items) {
       const { product_id, quantity } = item;
 
-      let inventory = await AgentInventory.findOne({
-        where: { agent_id, product_id, date: today },
+      const inventories = await AgentInventory.findAll({
+        where: { agent_id, product_id },
         transaction: t
+      });
+
+      // Sort by date DESC to check the most recent assignment first
+      const sortedInventories = [...inventories].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      let inventory = sortedInventories.find(invItem => {
+        const duration = invItem.duration_days;
+        if (duration === 9999 || duration === 0) return true; // permanent
+
+        const assignDate = new Date(invItem.date);
+        assignDate.setHours(0, 0, 0, 0);
+
+        const diffTime = todayDate.getTime() - assignDate.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        return diffDays >= 0 && diffDays < (duration || 1);
       });
 
       if (!inventory) {
@@ -65,7 +83,8 @@ exports.createSale = async (req, res) => {
           product_id,
           date: today,
           qty_given: quantity,
-          qty_sold: 0
+          qty_sold: 0,
+          duration_days: 1
         }, { transaction: t });
       } else {
         const availableQty = inventory.qty_given - inventory.qty_sold;
@@ -104,14 +123,32 @@ exports.createSale = async (req, res) => {
         subtotal
       }, { transaction: t });
 
-      const inventory = await AgentInventory.findOne({
-        where: { agent_id, product_id, date: today },
+      const inventories = await AgentInventory.findAll({
+        where: { agent_id, product_id },
         transaction: t
       });
 
-      await inventory.update({
-        qty_sold: inventory.qty_sold + quantity
-      }, { transaction: t });
+      // Sort by date DESC to check the most recent assignment first
+      const sortedInventories = [...inventories].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      const inventory = sortedInventories.find(invItem => {
+        const duration = invItem.duration_days;
+        if (duration === 9999 || duration === 0) return true; // permanent
+
+        const assignDate = new Date(invItem.date);
+        assignDate.setHours(0, 0, 0, 0);
+
+        const diffTime = todayDate.getTime() - assignDate.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        return diffDays >= 0 && diffDays < (duration || 1);
+      });
+
+      if (inventory) {
+        await inventory.update({
+          qty_sold: inventory.qty_sold + quantity
+        }, { transaction: t });
+      }
     }
 
     const transaction = await Transaction.create({

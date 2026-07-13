@@ -522,12 +522,57 @@ router.post('/assign-payment', async (req, res) => {
           // Deduct inventory
           try {
             const { AgentInventory } = require('../models');
-            const inv = await AgentInventory.findOne({
+            const inventories = await AgentInventory.findAll({
               where: { agent_id: payment.agentId, product_id: resolvedProductId }
             });
-            if (inv) {
-              inv.stock = Math.max(0, inv.stock - (prod.quantity || 1));
-              await inv.save();
+
+            const today = new Date().toISOString().split('T')[0];
+            const todayDate = new Date(today);
+            todayDate.setHours(0, 0, 0, 0);
+
+            // Sort by date DESC to check the most recent assignment first
+            const sortedInventories = [...inventories].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            let inv = sortedInventories.find(item => {
+              const duration = item.duration_days;
+              if (duration === 9999 || duration === 0) return true; // permanent
+
+              const assignDate = new Date(item.date);
+              assignDate.setHours(0, 0, 0, 0);
+
+              const diffTime = todayDate.getTime() - assignDate.getTime();
+              const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+              return diffDays >= 0 && diffDays < (duration || 1);
+            });
+
+            const quantityToDeduct = prod.quantity || 1;
+
+            if (!inv) {
+              // Auto-create active inventory today if not found, to prevent discrepancies
+              inv = await AgentInventory.create({
+                agent_id: payment.agentId,
+                product_id: resolvedProductId,
+                date: today,
+                qty_given: quantityToDeduct,
+                qty_sold: quantityToDeduct,
+                duration_days: 1
+              });
+              console.log(`tindaRoutes: Auto-created AgentInventory today for agent ${payment.agentId}, product ${resolvedProductId}`);
+            } else {
+              // Auto-increase qty_given if new qty_sold exceeds it
+              const newQtySold = inv.qty_sold + quantityToDeduct;
+              if (inv.qty_given < newQtySold) {
+                await inv.update({
+                  qty_given: newQtySold,
+                  qty_sold: newQtySold
+                });
+              } else {
+                await inv.update({
+                  qty_sold: newQtySold
+                });
+              }
+              console.log(`tindaRoutes: Updated AgentInventory ID ${inv.id} qty_sold to ${newQtySold}`);
             }
           } catch (invErr) {
             console.warn("Inventory deduction failed:", invErr.message);
