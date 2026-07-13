@@ -51,10 +51,10 @@ const startServer = async () => {
     await sequelize.authenticate();
     console.log('Database connection has been established successfully.');
 
-    // Sync database models
-    // In production, migrations are preferred, but sync(alter: true) is perfect for initial setup
-    await sequelize.sync({ alter: true });
-    console.log('Database synced successfully.');
+    // Sync database models: check if DB_FORCE_SYNC is enabled to recreate tables
+    const forceSync = process.env.DB_FORCE_SYNC === 'true';
+    await sequelize.sync({ force: forceSync, alter: !forceSync });
+    console.log(forceSync ? 'Database cleaned and recreated successfully.' : 'Database synced successfully.');
 
     // Seed database with default values
     await seedDatabase();

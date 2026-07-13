@@ -63,7 +63,15 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   const { username, password } = req.body;
   try {
-    const user = await User.findOne({ where: { username, is_active: true } });
+    // Case-insensitive username check
+    const user = await User.findOne({ 
+      where: User.sequelize.where(
+        User.sequelize.fn('LOWER', User.sequelize.col('username')),
+        username.toLowerCase()
+      ),
+      is_active: true 
+    });
+    
     if (!user) {
       return res.status(400).json({ error: 'Invalid username or password' });
     }
@@ -98,28 +106,16 @@ exports.login = async (req, res) => {
     });
   } catch (error) {
     console.warn("DB login query failed, falling back to mock logins.");
-    if (username === 'admin' && password === 'admin') {
+    if (username.toLowerCase() === 'admin' && password === '123456') {
       const token = jwt.sign(
-        { id: 1, username: 'admin', role: 'admin' },
+        { id: 1, username: 'Admin', role: 'admin' },
         process.env.JWT_SECRET || 'supersecretjwtkeyforagentposapp2026',
         { expiresIn: '30d' }
       );
       return res.json({
         message: 'Login successful (Mock Mode)',
         token,
-        user: { id: 1, username: 'admin', role: 'admin', phone: '+998 90 000 00 00', terminal_sn: global.mockTerminalMappings[1] || null }
-      });
-    }
-    if (username === 'sherzod_agent' && password === '123') {
-      const token = jwt.sign(
-        { id: 2, username: 'sherzod_agent', role: 'agent' },
-        process.env.JWT_SECRET || 'supersecretjwtkeyforagentposapp2026',
-        { expiresIn: '30d' }
-      );
-      return res.json({
-        message: 'Login successful (Mock Mode)',
-        token,
-        user: { id: 2, username: 'sherzod_agent', role: 'agent', phone: '+998 94 333 22 11', terminal_sn: global.mockTerminalMappings[2] || '2820330855' }
+        user: { id: 1, username: 'Admin', role: 'admin', phone: '+998 90 000 00 00', terminal_sn: global.mockTerminalMappings[1] || null }
       });
     }
     res.status(500).json({ error: error.message });
@@ -135,9 +131,7 @@ exports.getUsers = async (req, res) => {
   } catch (error) {
     console.warn("DB getUsers query failed, falling back to mock users.");
     const mockUsers = [
-      { id: 1, username: 'admin', name: 'Bosh Admin', role: 'admin', phone: '+998 90 000 00 00', is_active: true, terminal_sn: global.mockTerminalMappings[1] || null, tinda_ip: '', tinda_login: '', tinda_pin: '', tinda_default_mxik: '09901001001000000', tinda_default_package: '242030', tinda_test_mode: false },
-      { id: 2, username: 'sherzod_agent', name: 'Sherzod Alimov', role: 'agent', phone: '+998 94 333 22 11', is_active: true, terminal_sn: global.mockTerminalMappings[2] || '2820330855', tinda_ip: '192.168.1.100:8080', tinda_login: 'Sherzod', tinda_pin: '1111', tinda_default_mxik: '09901001001000000', tinda_default_package: '242030', tinda_test_mode: true },
-      { id: 3, username: 'malika_agent', name: 'Malika Qodirova', role: 'agent', phone: '+998 97 777 55 44', is_active: true, terminal_sn: global.mockTerminalMappings[3] || 'TEST-SN-999', tinda_ip: '192.168.1.101:8080', tinda_login: 'Malika', tinda_pin: '2222', tinda_default_mxik: '09901001001000000', tinda_default_package: '242030', tinda_test_mode: true }
+      { id: 1, username: 'Admin', name: 'Ali Umarov', role: 'admin', phone: '+998 90 000 00 00', is_active: true, terminal_sn: global.mockTerminalMappings[1] || null, tinda_ip: '', tinda_login: '', tinda_pin: '', tinda_default_mxik: '09901001001000000', tinda_default_package: '242030', tinda_test_mode: false }
     ];
     res.json(mockUsers);
   }
