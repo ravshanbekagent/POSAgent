@@ -74,6 +74,24 @@ exports.deleteStore = async (req, res) => {
       return res.status(404).json({ error: 'Store not found' });
     }
     await store.destroy();
+
+    // Reset sequence if no stores left in database
+    const count = await Store.count();
+    if (count === 0) {
+      try {
+        const dbType = Store.sequelize.options.dialect;
+        if (dbType === 'postgres') {
+          await Store.sequelize.query('ALTER SEQUENCE "stores_id_seq" RESTART WITH 1;');
+        } else if (dbType === 'mysql') {
+          await Store.sequelize.query('ALTER TABLE `stores` AUTO_INCREMENT = 1;');
+        } else if (dbType === 'sqlite') {
+          await Store.sequelize.query("DELETE FROM sqlite_sequence WHERE name='stores';");
+        }
+      } catch (seqError) {
+        console.error("Failed to reset sequence:", seqError);
+      }
+    }
+
     res.json({ message: 'Store deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
