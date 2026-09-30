@@ -3,10 +3,10 @@ require('dotenv').config();
 
 const dialectOptions = {};
 
-// Enable SSL for cloud database hosts (Neon, Render) or in production
+// Enable SSL for cloud database hosts (Neon, Render, Supabase) or in production
 if (
   process.env.NODE_ENV === 'production' ||
-  (process.env.DB_HOST && (process.env.DB_HOST.includes('neon.tech') || process.env.DB_HOST.includes('render.com')))
+  (process.env.DB_HOST && (process.env.DB_HOST.includes('neon.tech') || process.env.DB_HOST.includes('render.com') || process.env.DB_HOST.includes('supabase.co')))
 ) {
   dialectOptions.ssl = {
     require: true,
